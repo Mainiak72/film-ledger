@@ -126,6 +126,10 @@ body {
   letter-spacing: 0.04em;
 }
 
+.search-bar {
+  padding: 8px 16px 10px;
+}
+
 .search-row {
   display: flex;
   gap: 8px;
