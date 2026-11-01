@@ -32,6 +32,7 @@ function setViewMode(tabId, mode) {
   else if (tabId === 'recs') renderRecommendations(recsPage);
   else if (tabId === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
   else if (tabId === 'watching') renderList('watching', m => m.status === 'watching');
+  else if (tabId === 'least') renderLeastFavorite();
   else render();
 }
 
@@ -576,7 +577,7 @@ function renderTop10() {
           <div class="meta">${m.year || ''} ${m.genre ? '· ' + m.genre : ''}</div>
         </div>
         <span class="rating">${m.rating}%</span>
-        <button onclick="showDetails('${m.id}')" style="font-size:0.7rem; padding:4px 8px;">Details</button>
+        <div class="item-actions" onclick="event.stopPropagation()" style="margin:0;">${libraryButtons(m, i + 1)}</div>
       </div>
     `).join('');
   }
@@ -611,18 +612,18 @@ function moveTop10(id, direction) {
 function renderLeastFavorite() {
   const el = document.getElementById('least');
   const rated = filtered().filter(m => m.rating != null && m.status === 'watched' && m.rating <= 50);
-  const sorted = [...rated].sort((a, b) => a.rating - b.rating || a.title.localeCompare(b.title)).slice(0, 10);
-  
-  let html = '<h3 style="margin-bottom:14px; font-weight:600;">Least Favorite</h3>';
+  const sorted = [...rated].sort((a, b) => a.rating - b.rating || (a.title || '').localeCompare(b.title || '')).slice(0, 10);
+  const view = getViewMode('least');
+
+  let html = tabHead('<h3>Least Favorite</h3>', 'least');
   if (sorted.length === 0) {
     html += '<div class="empty">No low-rated movies yet.</div>';
+  } else if (view === 'large') {
+    html += `<div class="list-container large">` + sorted.map((m, i) => renderItem(m, 'large', i + 1)).join('') + '</div>';
+  } else if (view === 'bullet') {
+    html += sorted.map((m, i) => renderItem(m, 'bullet', i + 1)).join('');
   } else {
-    html += sorted.map((m, i) => `
-      <div class="card" style="display:flex; align-items:flex-start; gap:10px;">
-        <div class="rank-num" style="margin-top:4px;">${i + 1}</div>
-        <div style="flex:1;">${movieCard(m).replace(/class="card"/, 'style="background:none; border:none; padding:0; margin:0; box-shadow:none;"')}</div>
-      </div>
-    `).join('');
+    html += sorted.map((m, i) => renderItem(m, 'medium', i + 1)).join('');
   }
   el.innerHTML = html;
 }
@@ -663,7 +664,7 @@ function renderDecades() {
             <div class="meta">${m.year || ''}</div>
           </div>
           <span class="rating">${m.rating}%</span>
-          <button onclick="showDetails('${m.id}')" style="font-size:0.7rem; padding:4px 8px;">Details</button>
+          <div class="item-actions" onclick="event.stopPropagation()" style="margin:0;">${libraryButtons(m, i + 1)}</div>
         </div>
       `).join('');
     }
@@ -703,7 +704,7 @@ function renderSeasonal(page = 1) {
   const el = document.getElementById('seasonal');
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) {
-    el.innerHTML = '<div class="empty">Add your TMDB API key in the search bar to load seasonal titles.</div>';
+    el.innerHTML = '<div class="empty">Add your TMDB API key in Settings to load seasonal titles.</div>';
     return;
   }
   el.innerHTML = '<div class="empty">Loading seasonal...</div>';
@@ -757,13 +758,20 @@ function renderSeasonal(page = 1) {
             ? `<span style="color:#4ade80; font-size:0.7rem; margin-left:6px;">· ${existing.status === 'watched' ? 'Watched' : existing.status}</span>`
             : '';
 
+          const addBtn = existing
+            ? ''
+            : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')" style="font-size:0.65rem; padding:2px 6px;">Add</button>`;
+          const addBtnFull = existing
+            ? `<span style="color:#4ade80; font-size:0.75rem;">${existing.status === 'watched' ? 'Watched' : existing.status}</span>`
+            : `<button type="button" onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')" style="font-size:0.75rem;">Add to Watchlist</button>`;
+
           if (view === 'bullet') {
             return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')">
               <span class="bullet-title">${escapeHtml(title)}</span>
               <span class="bullet-actions" onclick="event.stopPropagation()">
                 ${statusLabel}
                 <button onclick="showSearchDetails(${m.id}, '${endpoint}')" style="font-size:0.65rem; padding:2px 6px;">Details</button>
-                <button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')" style="font-size:0.65rem; padding:2px 6px;">Add</button>
+                ${addBtn}
               </span>
             </div>`;
           }
@@ -776,7 +784,7 @@ function renderSeasonal(page = 1) {
               </div>
               <div class="poster-actions">
                 <button onclick="showSearchDetails(${m.id}, '${endpoint}')">Details</button>
-                <button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')">Add</button>
+                ${existing ? `<span style="color:#4ade80; font-size:0.75rem;">${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')">Add</button>`}
               </div>
             </div>`;
           }
@@ -791,7 +799,7 @@ function renderSeasonal(page = 1) {
               </div>
               <div style="margin-top:6px; display:flex; gap:6px;">
                 <button onclick="showSearchDetails(${m.id}, '${endpoint}')" style="font-size:0.75rem;">Details</button>
-                <button type="button" onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', '${origin}')" style="font-size:0.75rem;">Add to Watchlist</button>
+                ${addBtnFull}
               </div>
             </div>
           `;
@@ -816,7 +824,7 @@ function renderRecommendations(page = 1) {
 
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) {
-    el.innerHTML = '<div class="empty">Add your TMDB API key in the search bar first.</div>';
+    el.innerHTML = '<div class="empty">Add your TMDB API key in Settings first.</div>';
     return;
   }
 
@@ -1652,7 +1660,13 @@ function deleteMovie(id) {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/[&<>"']/g, c => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c]));
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&',
+    '<': '<',
+    '>': '>',
+    '"': '"',
+    "'": '&#39;'
+  }[c]));
 }
 
 function jsArg(str) {
@@ -1776,7 +1790,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.57</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.58</p>
   `;
 }
 
