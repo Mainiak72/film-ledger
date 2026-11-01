@@ -994,8 +994,130 @@ function searchMovies(page = 1) {
     return;
   }
 
-  // Title search first (prioritize movies/shows over people)
+  // Name-like query: prefer a matching person and group their work
+  if (query.split(/\s+/).length <= 3 && /[a-z]/i.test(query)) {
+    fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=1`)
+      .then(r => r.json())
+      .then(personData => {
+        const person = (personData.results || []).find(p => personNameMatches(p, query));
+        if (person) {
+          showPersonCredits(person, apiKey, resultsEl, query);
+          return;
+        }
+        doTitleSearch(query, page, apiKey, resultsEl);
+      })
+      .catch(() => doTitleSearch(query, page, apiKey, resultsEl));
+    return;
+  }
+
   doTitleSearch(query, page, apiKey, resultsEl);
+}
+
+function personNameMatches(person, query) {
+  const q = query.toLowerCase().trim();
+  const parts = (person.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!parts.length) return false;
+  if (parts.join(' ') === q) return true;
+  return parts.some(p => p === q || (q.length >= 4 && p.startsWith(q)));
+}
+
+function creditYear(m) {
+  const d = m.release_date || m.first_air_date || '';
+  return d ? parseInt(d.slice(0, 4), 10) || 0 : 0;
+}
+
+function byYear(a, b) {
+  return creditYear(b) - creditYear(a) || (b.popularity || 0) - (a.popularity || 0);
+}
+
+function uniqueById(list) {
+  const seen = new Set();
+  return list.filter(m => {
+    const key = m.id + ':' + (m.media_type || '');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function groupPersonCredits(person, credits) {
+  const dept = person.known_for_department || '';
+  const cast = credits.cast || [];
+  const crew = credits.crew || [];
+  const isMovie = m => m.media_type === 'movie';
+  const isShow = m => m.media_type === 'tv';
+  const job = (m, name) => (m.job || '') === name;
+  const produced = m => /producer/i.test(m.job || '');
+  const wrote = m => /writer|screenplay|story/i.test(m.job || '');
+
+  const sections = [];
+  const used = new Set();
+  const add = (label, items) => {
+    const list = uniqueById(items.filter(m => (isMovie(m) || isShow(m)) && !used.has(m.id + ':' + (m.media_type || '')))).sort(byYear);
+    const movies = list.filter(isMovie);
+    const shows = list.filter(isShow);
+    const ordered = [...movies, ...shows].slice(0, 12);
+    ordered.forEach(m => used.add(m.id + ':' + (m.media_type || '')));
+    if (ordered.length) sections.push({ label, items: ordered });
+  };
+
+  if (dept === 'Directing' || crew.some(m => job(m, 'Director'))) {
+    add('Directed', crew.filter(m => job(m, 'Director')));
+    add('Produced', crew.filter(produced));
+    add('Wrote', crew.filter(wrote));
+    add('Other crew', crew.filter(m => !job(m, 'Director') && !produced(m) && !wrote(m)));
+    add('Acted', cast);
+  } else {
+    const leads = cast.filter(m => (m.order == null ? 99 : m.order) <= 2);
+    const other = cast.filter(m => (m.order == null ? 99 : m.order) > 2);
+    add('Leading roles', leads);
+    add('Other roles', other);
+    add('Directed', crew.filter(m => job(m, 'Director')));
+    add('Produced', crew.filter(produced));
+    add('Wrote', crew.filter(wrote));
+  }
+  return sections;
+}
+
+function showPersonCredits(person, apiKey, resultsEl, query) {
+  resultsEl.innerHTML = `<div class="empty" style="margin-bottom:8px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
+  fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${apiKey}`)
+    .then(r => r.json())
+    .then(credits => {
+      const sections = groupPersonCredits(person, credits);
+      if (!sections.length) {
+        resultsEl.innerHTML = '<div class="empty">No results.</div>';
+        return;
+      }
+      const flat = [];
+      let html = '';
+      sections.forEach(section => {
+        html += `<div class="stat-label" style="margin:12px 4px 6px;">${escapeHtml(section.label)}</div>`;
+        section.items.forEach(m => {
+          const idx = flat.length;
+          flat.push(m);
+          const isTV = m.media_type === 'tv';
+          const title = isTV ? m.name : m.title;
+          const year = creditYear(m) || '';
+          const role = m.job || m.character || '';
+          const poster = m.poster_path
+            ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
+            : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+          html += `
+            <div class="card" style="display:flex; align-items:center; padding:8px;">
+              ${poster}
+              <div style="flex:1;">
+                <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
+                <div class="meta">${year}${role ? ' · ' + escapeHtml(role) : ''}</div>
+              </div>
+              <button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>
+            </div>`;
+        });
+      });
+      window.lastSearchResults = flat;
+      resultsEl.innerHTML += html;
+    })
+    .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
 }
 
 function doPersonSearch(query, apiKey, resultsEl) {
@@ -1006,41 +1128,7 @@ function doPersonSearch(query, apiKey, resultsEl) {
         resultsEl.innerHTML = '<div class="empty">No results.</div>';
         return;
       }
-      const person = personData.results[0];
-      resultsEl.innerHTML = `<div class="empty" style="margin-bottom:8px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
-      fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${apiKey}`)
-        .then(r => r.json())
-        .then(credits => {
-          const all = (credits.cast || []).concat(credits.crew || [])
-            .filter(m => m.media_type === 'movie' || m.media_type === 'tv')
-            .filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i)
-            .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-            .slice(0, 16);
-          if (all.length === 0) {
-            resultsEl.innerHTML = '<div class="empty">No results.</div>';
-            return;
-          }
-          window.lastSearchResults = all;
-          let html = all.map((m, idx) => {
-            const isTV = m.media_type === 'tv';
-            const title = isTV ? m.name : m.title;
-            const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-            const poster = m.poster_path
-              ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
-              : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-            return `
-              <div class="card" style="display:flex; align-items:center; padding:8px;">
-                ${poster}
-                <div style="flex:1;">
-                  <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
-                  <div class="meta">${year}</div>
-                </div>
-                <button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>
-              </div>`;
-          }).join('');
-          resultsEl.innerHTML += html;
-        })
-        .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+      showPersonCredits(personData.results[0], apiKey, resultsEl, query);
     })
     .catch(() => resultsEl.innerHTML = '<div class="empty">No results.</div>');
 }
@@ -1527,7 +1615,7 @@ function renderSettings() {
       <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
       <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.21</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.22</p>
   `;
 }
 
