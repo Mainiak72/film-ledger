@@ -215,17 +215,18 @@ button:hover {
 }
 
 .mode-btn.active {
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
-  color: #1a1408;
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(212,175,55,0.3);
+  background: transparent;
+  color: var(--accent);
+  border-color: transparent;
+  box-shadow: none;
+  font-size: 1rem;
 }
 
 nav {
   display: flex;
-  gap: 4px;
+  gap: 1px;
   overflow-x: auto;
-  padding: 8px 16px 10px;
+  padding: 6px 10px 8px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -236,8 +237,8 @@ nav button {
   background: transparent;
   color: var(--muted);
   border: none;
-  padding: 7px 12px;
-  border-radius: 20px;
+  padding: 6px 7px;
+  border-radius: 0;
   font-size: 0.78rem;
   font-weight: 500;
   white-space: nowrap;
@@ -246,10 +247,12 @@ nav button {
 }
 
 nav button.active {
-  background: var(--surface);
+  background: transparent;
   color: var(--accent);
-  border: 1px solid var(--accent);
-  letter-spacing: 0.04em;
+  border: none;
+  letter-spacing: 0.02em;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .container {
