@@ -1,11 +1,11 @@
-const CACHE_NAME = 'film-ledger-v5.56';
+const CACHE_NAME = 'film-ledger-v5.57';
 const urlsToCache = [
   './',
   './index.html',
   './styles.css',
-  './app.js?v=556',
+  './app.js?v=557',
   './manifest.json',
-  './film-ledger-title.png?v=556'
+  './film-ledger-title.png?v=557'
 ];
 
 self.addEventListener('install', event => {
