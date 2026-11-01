@@ -44,8 +44,12 @@ body {
 
 .brand-mark {
   width: 100%;
+  max-width: 640px;
+  max-height: 92px;
   height: auto;
   display: block;
+  margin: 6px auto;
+  object-fit: contain;
 }
 
 .brand-ver {

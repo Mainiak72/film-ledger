@@ -1733,7 +1733,7 @@ function renderSettings() {
       <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
       <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.31</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.32</p>
   `;
 }
 
