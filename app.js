@@ -1384,9 +1384,39 @@ function showToast(message) {
 function editRating(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
-  const input = prompt(`Rate "${m.title}" (0–100):`, m.rating || '');
-  if (input === null) return;
-  const num = parseInt(input);
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
+  const modal = document.createElement('div');
+  modal.className = 'sheet';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:360px; width:100%; padding:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <h3 style="font-size:1.05rem;">Rate ${escapeHtml(m.title)}</h3>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
+      </div>
+      <p style="color:#a89880; font-size:0.82rem; margin-bottom:12px;">0–100. Saving marks it watched.</p>
+      <input id="rateInput" type="number" min="0" max="100" inputmode="numeric" value="${m.rating != null ? m.rating : ''}" placeholder="0–100" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:12px; border-radius:10px; font-size:1.1rem; margin-bottom:12px;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" onclick="saveRating('${m.id}')" style="flex:1; background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save</button>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="flex:1;">Cancel</button>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  const input = document.getElementById('rateInput');
+  if (input) {
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') saveRating(id); });
+  }
+}
+
+function saveRating(id) {
+  const m = movies.find(x => x.id === id);
+  const input = document.getElementById('rateInput');
+  if (!m || !input) return;
+  const num = parseInt(input.value, 10);
   if (isNaN(num) || num < 0 || num > 100) {
     alert('Enter a number between 0 and 100');
     return;
