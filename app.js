@@ -939,6 +939,71 @@ function renderRecommendations(page = 1) {
   });
 }
 
+let suggestTimer = null;
+
+function onSearchInput() {
+  clearTimeout(suggestTimer);
+  const q = document.getElementById('searchQuery').value.trim();
+  if (q.length < 2) {
+    document.getElementById('suggestions').innerHTML = '';
+    return;
+  }
+  suggestTimer = setTimeout(() => fetchSuggestions(q), 220);
+}
+
+function fetchSuggestions(q) {
+  const apiKey = localStorage.getItem('tmdbKey') || '';
+  const box = document.getElementById('suggestions');
+  if (!apiKey) { box.innerHTML = ''; return; }
+  Promise.all([
+    fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(q)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
+    fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(q)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
+  ]).then(([multi, people]) => {
+    if (document.getElementById('searchQuery').value.trim() !== q) return;
+    const titles = (multi.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 5);
+    const persons = (people.results || []).slice(0, 3);
+    const items = [];
+    titles.forEach(m => items.push({ kind: 'title', data: m }));
+    persons.forEach(p => items.push({ kind: 'person', data: p }));
+    if (!items.length) { box.innerHTML = ''; return; }
+    window._suggestions = items;
+    box.innerHTML = items.map((item, i) => {
+      if (item.kind === 'person') {
+        const p = item.data;
+        const img = p.profile_path
+          ? `<img src="https://image.tmdb.org/t/p/w92${p.profile_path}" alt="">`
+          : '<div class="suggest-ph"></div>';
+        return `<div class="suggest-item" onclick="pickSuggestion(${i})">${img}<div><div class="title">${escapeHtml(p.name)}</div><div class="suggest-kind">${escapeHtml(p.known_for_department || 'Person')}</div></div></div>`;
+      }
+      const m = item.data;
+      const isTV = m.media_type === 'tv';
+      const title = isTV ? m.name : m.title;
+      const year = (isTV ? m.first_air_date : m.release_date || '').slice(0, 4);
+      const img = m.poster_path
+        ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" alt="">`
+        : '<div class="suggest-ph"></div>';
+      return `<div class="suggest-item" onclick="pickSuggestion(${i})">${img}<div><div class="title">${escapeHtml(title || '')}</div><div class="suggest-kind">${isTV ? 'TV' : 'Movie'}${year ? ' · ' + year : ''}</div></div></div>`;
+    }).join('');
+  });
+}
+
+function pickSuggestion(i) {
+  const item = (window._suggestions || [])[i];
+  if (!item) return;
+  document.getElementById('suggestions').innerHTML = '';
+  const apiKey = localStorage.getItem('tmdbKey') || '';
+  const resultsEl = document.getElementById('searchResults');
+  if (item.kind === 'person') {
+    document.getElementById('searchQuery').value = item.data.name;
+    showPersonCredits(item.data, apiKey, resultsEl, item.data.name);
+    return;
+  }
+  const m = item.data;
+  const isTV = m.media_type === 'tv';
+  document.getElementById('searchQuery').value = isTV ? m.name : m.title;
+  searchMovies();
+}
+
 function searchMovies(page = 1) {
   const query = document.getElementById('searchQuery').value.trim();
   const apiKey = localStorage.getItem('tmdbKey') || '';
@@ -1668,7 +1733,7 @@ function renderSettings() {
       <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
       <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.23</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.24</p>
   `;
 }
 
