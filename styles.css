@@ -269,10 +269,10 @@ button:hover {
 }
 
 .mode-btn.active {
-  background: transparent;
-  color: var(--accent);
-  border-color: transparent;
-  box-shadow: none;
+  background: var(--accent);
+  color: #1a1408;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
   font-size: 1rem;
 }
 
