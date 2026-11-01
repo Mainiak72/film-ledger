@@ -5,11 +5,6 @@ function save() {
   localStorage.setItem('movies', JSON.stringify(movies));
 }
 
-function toggleSettings() {
-  const keyInput = document.getElementById('apiKey');
-  keyInput.style.display = keyInput.style.display === 'none' ? 'block' : 'none';
-}
-
 function setMode(mode) {
   currentMode = mode;
   document.getElementById('btnMovies').classList.toggle('active', mode === 'movie');
@@ -214,6 +209,7 @@ function render() {
   renderSeasonal(seasonalPage);
   renderRecommendations(recsPage);
   renderStats();
+  renderSettings();
 }
 
 function renderList(tabId, filter) {
@@ -944,7 +940,7 @@ function renderRecommendations(page = 1) {
 
 function searchMovies(page = 1) {
   const query = document.getElementById('searchQuery').value.trim();
-  const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('tmdbKey') || '';
+  const apiKey = localStorage.getItem('tmdbKey') || '';
   if (!query) {
     showRecentSearches();
     return;
@@ -1225,7 +1221,6 @@ function importData(event) {
       movies = data.movies;
       if (data.tmdbKey) {
         localStorage.setItem('tmdbKey', data.tmdbKey);
-        document.getElementById('apiKey').value = data.tmdbKey;
       }
       save();
       render();
@@ -1245,8 +1240,6 @@ function clearSearchHistory() {
 
 // Show recent on focus
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('tmdbKey');
-  if (saved) document.getElementById('apiKey').value = saved;
   const input = document.getElementById('searchQuery');
   if (input) {
     input.addEventListener('focus', showRecentSearches);
@@ -1328,6 +1321,7 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
   renderTop10();
   renderDecades();
   renderStats();
+  renderSettings();
   // Keep search results so user can add sequels / more from the same search
   markSearchResultAdded(tmdbId, mediaType, title);
 }
@@ -1505,6 +1499,21 @@ function renderStats() {
     ${lowest ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:4px;">Lowest Rated</div><div style="font-weight:600;">${escapeHtml(lowest.title)} <span style="color:#d4af37;">${lowest.rating}%</span></div></div>` : ''}
     ${topGenres.length ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:6px;">Top Genres</div>${topGenres.map(([g, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${escapeHtml(g)}</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
     ${topDecades.length ? `<div style="margin-bottom:18px;"><div class="stat-label" style="margin-bottom:6px;">By Decade</div>${topDecades.map(([d, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${d}s</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
+  `;
+}
+
+function renderSettings() {
+  const el = document.getElementById('settings');
+  if (!el) return;
+  const key = localStorage.getItem('tmdbKey') || '';
+  const recent = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+  el.innerHTML = `
+    <div class="backup-box">
+      <div class="stat-label" style="margin-bottom:6px;">TMDB API Key</div>
+      <p class="backup-note">Search, details, seasonal, and recommendations need a free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org/settings/api</a>.</p>
+      <input id="settingsKey" type="text" value="${escapeHtml(key)}" placeholder="Paste your TMDB key" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-bottom:10px;">
+      <button type="button" onclick="saveApiKey()" style="background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save Key</button>
+    </div>
     <div class="backup-box">
       <div class="stat-label" style="margin-bottom:6px;">Library Backup</div>
       <p class="backup-note">Export saves a JSON file of your whole library — every movie and show, ratings, watched status, favorites, top 10 pins, notes, and your TMDB key. Import replaces the current library with that file.</p>
@@ -1513,7 +1522,27 @@ function renderStats() {
         <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
       </div>
     </div>
+    <div class="backup-box">
+      <div class="stat-label" style="margin-bottom:6px;">Search History</div>
+      <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
+      <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
+    </div>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.21</p>
   `;
+}
+
+function saveApiKey() {
+  const input = document.getElementById('settingsKey');
+  if (!input) return;
+  const key = input.value.trim();
+  if (!key) {
+    localStorage.removeItem('tmdbKey');
+    showToast('API key cleared');
+  } else {
+    localStorage.setItem('tmdbKey', key);
+    showToast('API key saved');
+  }
+  renderSettings();
 }
 
 function showTab(tab) {
@@ -1547,9 +1576,6 @@ async function backfillPosters() {
 }
 
 function startLedger() {
-  const saved = localStorage.getItem("tmdbKey");
-  const keyEl = document.getElementById("apiKey");
-  if (saved && keyEl) keyEl.value = saved;
   const input = document.getElementById("searchQuery");
   if (input && !input.dataset.bound) {
     input.dataset.bound = "1";
