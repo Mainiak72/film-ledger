@@ -1474,7 +1474,15 @@ function renderStats() {
     ${highest ? `<div style="margin-bottom:12px;"><div class="stat-label" style="margin-bottom:4px;">Highest Rated</div><div style="font-weight:600;">${escapeHtml(highest.title)} <span style="color:#d4af37;">${highest.rating}%</span></div></div>` : ''}
     ${lowest ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:4px;">Lowest Rated</div><div style="font-weight:600;">${escapeHtml(lowest.title)} <span style="color:#d4af37;">${lowest.rating}%</span></div></div>` : ''}
     ${topGenres.length ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:6px;">Top Genres</div>${topGenres.map(([g, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${escapeHtml(g)}</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
-    ${topDecades.length ? `<div><div class="stat-label" style="margin-bottom:6px;">By Decade</div>${topDecades.map(([d, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${d}s</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
+    ${topDecades.length ? `<div style="margin-bottom:18px;"><div class="stat-label" style="margin-bottom:6px;">By Decade</div>${topDecades.map(([d, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${d}s</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
+    <div class="backup-box">
+      <div class="stat-label" style="margin-bottom:6px;">Library Backup</div>
+      <p class="backup-note">Export saves a JSON file of your whole library — every movie and show, ratings, watched status, favorites, top 10 pins, notes, and your TMDB key. Import replaces the current library with that file.</p>
+      <div class="backup-actions">
+        <button type="button" onclick="exportData()">Export</button>
+        <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
+      </div>
+    </div>
   `;
 }
 

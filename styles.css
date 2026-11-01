@@ -143,6 +143,35 @@ button:hover {
   color: #1a1408;
 }
 
+#settingsBtn svg {
+  display: block;
+}
+
+.backup-box {
+  margin-top: 8px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.backup-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.backup-actions button {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .util-row {
   display: flex;
   gap: 6px;
