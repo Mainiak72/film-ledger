@@ -170,9 +170,20 @@ button:hover {
   gap: 8px;
 }
 
-.backup-actions button {
-  border-color: var(--accent);
+.backup-actions button,
+.import-label {
+  border: 1px solid var(--accent);
   color: var(--accent);
+  background: var(--surface);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.import-label input {
+  display: none;
 }
 
 .util-row {

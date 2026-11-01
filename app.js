@@ -121,10 +121,11 @@ function addToTop(id, which) {
       alert(`"${m.title}" is already in your ${label} Top 10 because of its score.`);
       return;
     }
-    if (!confirm(`Remove "${m.title}" from your ${label} Top 10?`)) return;
-    m[key] = false;
-    save();
-    render();
+    askConfirm(`Remove "${m.title}" from your ${label} Top 10?`, () => {
+      m[key] = false;
+      save();
+      render();
+    });
     return;
   }
   const pool = which === 'decade'
@@ -994,8 +995,9 @@ function searchMovies(page = 1) {
     return;
   }
 
-  // Name-like query: prefer a matching person and group their work
-  if (query.split(/\s+/).length <= 3 && /[a-z]/i.test(query)) {
+  // One word is usually a person (Nolan, Tarantino). Two or more is usually a title.
+  const words = query.split(/\s+/).filter(Boolean);
+  if (words.length === 1 && /[a-z]/i.test(query)) {
     fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=1`)
       .then(r => r.json())
       .then(personData => {
@@ -1133,17 +1135,23 @@ function doPersonSearch(query, apiKey, resultsEl) {
     .catch(() => resultsEl.innerHTML = '<div class="empty">No results.</div>');
 }
 
-function doTitleSearch(query, page, apiKey, resultsEl) {
+function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
     .then(r => r.json())
     .then(data => {
-      if (!data.results || data.results.length === 0) {
-        // No titles — try person search as fallback
+      const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
+      if (hits.length === 0 && page === 1) {
+        const next = titleVariants(query).find(v => !tried.includes(v) && v !== query);
+        if (next) {
+          doTitleSearch(next, 1, apiKey, resultsEl, [...tried, query]);
+          return;
+        }
         doPersonSearch(query, apiKey, resultsEl);
         return;
       }
-      const filtered = data.results.filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 8);
+      const filtered = hits.slice(0, 8);
       const totalPages = data.total_pages || 1;
+      const note = tried.length ? `<div class="empty" style="margin-bottom:8px;">Showing results for <strong>${escapeHtml(query)}</strong></div>` : '';
       
       const detailFetches = filtered.map(m => {
         const endpoint = m.media_type === 'tv' ? 'tv' : 'movie';
@@ -1193,10 +1201,32 @@ function doTitleSearch(query, page, apiKey, resultsEl) {
             ${page < totalPages ? `<button onclick="searchMovies(${page + 1})" style="font-size:0.75rem; padding:6px 12px;">Next</button>` : ''}
           </div>`;
         }
-        resultsEl.innerHTML = html;
+        resultsEl.innerHTML = note + html;
       });
     })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+}
+
+function titleVariants(query) {
+  const fixes = { resevior: 'reservoir', reservior: 'reservoir', resevoir: 'reservoir', reciev: 'receiv' };
+  const words = query.toLowerCase().split(/\s+/);
+  const out = new Set();
+  words.forEach((w, i) => {
+    if (fixes[w]) {
+      const copy = words.slice();
+      copy[i] = fixes[w];
+      out.add(copy.join(' '));
+    }
+    if (w.includes('e') && w.includes('i')) {
+      const swapped = w.replace('e', 'i').replace('i', 'e');
+      if (swapped !== w) {
+        const copy = words.slice();
+        copy[i] = swapped;
+        out.add(copy.join(' '));
+      }
+    }
+  });
+  return [...out];
 }
 
 function renderDiscoverResults(data, resultsEl, page, endpoint, apiKey) {
@@ -1297,28 +1327,48 @@ function exportData() {
   URL.revokeObjectURL(a.href);
 }
 
+function askConfirm(message, onYes) {
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
+  const modal = document.createElement('div');
+  modal.className = 'sheet';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:360px; width:100%; padding:18px;">
+      <p style="margin-bottom:14px; line-height:1.4;">${escapeHtml(message)}</p>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="confirmYes" style="flex:1; background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Yes</button>
+        <button type="button" id="confirmNo" style="flex:1;">Cancel</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  modal.querySelector('#confirmNo').onclick = () => modal.remove();
+  modal.querySelector('#confirmYes').onclick = () => { modal.remove(); onYes(); };
+}
+
 function importData(event) {
-  const file = event.target.files[0];
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data.movies)) throw new Error('Invalid backup');
-      if (!confirm('Replace your current library with this backup?')) return;
-      movies = data.movies;
-      if (data.tmdbKey) {
-        localStorage.setItem('tmdbKey', data.tmdbKey);
-      }
-      save();
-      render();
-      alert('Import complete. ' + movies.length + ' items restored.');
+      const parsed = JSON.parse(e.target.result);
+      const list = Array.isArray(parsed) ? parsed : (parsed.movies || parsed.library || parsed.items);
+      if (!Array.isArray(list)) throw new Error('No movie list in that file');
+      askConfirm('Replace your current library with this backup? ' + list.length + ' items.', () => {
+        movies = list;
+        if (parsed && parsed.tmdbKey) localStorage.setItem('tmdbKey', parsed.tmdbKey);
+        save();
+        render();
+        showToast('Imported ' + movies.length + ' items');
+      });
     } catch (err) {
       alert('Could not import: ' + err.message);
     }
   };
+  reader.onerror = () => alert('Could not read that file.');
   reader.readAsText(file);
-  event.target.value = '';
 }
 
 function clearSearchHistory() {
@@ -1337,11 +1387,12 @@ document.addEventListener('DOMContentLoaded', () => {
 function removeFromLibrary(tmdbId, mediaType) {
   const m = movies.find(x => x.tmdbId === tmdbId && x.mediaType === mediaType);
   if (!m) return;
-  if (!confirm(`Remove "${m.title}" from your library?`)) return;
-  movies = movies.filter(x => x.id !== m.id);
-  save();
-  render();
-  searchMovies();
+  askConfirm(`Remove "${m.title}" from your library?`, () => {
+    movies = movies.filter(x => x.id !== m.id);
+    save();
+    render();
+    searchMovies();
+  });
 }
 
 function addFromSearchIndex(idx) {
@@ -1515,21 +1566,23 @@ function saveRating(id) {
 function setStatus(id, status) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
-  if (!confirm(`Move "${m.title}" to ${status}?`)) return;
-  m.status = status;
-  if (status === 'watched' && !m.watchedDate) m.watchedDate = new Date().toISOString().slice(0, 10);
-  save();
-  render();
+  askConfirm(`Move "${m.title}" to ${status}?`, () => {
+    m.status = status;
+    if (status === 'watched' && !m.watchedDate) m.watchedDate = new Date().toISOString().slice(0, 10);
+    save();
+    render();
+  });
 }
 
 function deleteMovie(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
-  if (!confirm(`Delete "${m.title}" permanently?`)) return;
-  movies = movies.filter(x => x.id !== id);
-  save();
-  document.querySelectorAll('.sheet').forEach(el => el.remove());
-  render();
+  askConfirm(`Delete "${m.title}" permanently?`, () => {
+    movies = movies.filter(x => x.id !== id);
+    save();
+    document.querySelectorAll('.sheet').forEach(el => el.remove());
+    render();
+  });
 }
 
 function escapeHtml(str) {
@@ -1607,7 +1660,7 @@ function renderSettings() {
       <p class="backup-note">Export saves a JSON file of your whole library — every movie and show, ratings, watched status, favorites, top 10 pins, notes, and your TMDB key. Import replaces the current library with that file.</p>
       <div class="backup-actions">
         <button type="button" onclick="exportData()">Export</button>
-        <button type="button" onclick="document.getElementById('importFile').click()">Import</button>
+        <label class="import-label">Import<input type="file" accept="application/json,.json,text/json" onchange="importData(event)"></label>
       </div>
     </div>
     <div class="backup-box">
@@ -1615,7 +1668,7 @@ function renderSettings() {
       <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
       <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.22</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.23</p>
   `;
 }
 
