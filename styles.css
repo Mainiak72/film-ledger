@@ -64,13 +64,13 @@ body {
 
 #settingsBtn {
   position: absolute;
-  right: 10px;
-  top: 8px;
+  right: 8px;
+  top: 6px;
   background: rgba(0,0,0,0.55);
   border: 1px solid var(--border);
   color: var(--accent);
-  width: 44px;
-  height: 44px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   cursor: pointer;
   z-index: 10;
