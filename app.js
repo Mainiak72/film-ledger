@@ -1708,6 +1708,42 @@ function renderStats() {
   `;
 }
 
+const ALL_TABS = [
+  ['seasonal', 'Seasonal'],
+  ['watchlist', 'Watchlist'],
+  ['watching', 'Watching'],
+  ['alltime', 'Watched'],
+  ['recs', 'Recommended'],
+  ['top10', 'Top 10'],
+  ['decades', 'Decades'],
+  ['least', 'Least'],
+  ['stats', 'Stats']
+];
+
+function visibleTabs() {
+  const saved = JSON.parse(localStorage.getItem('visibleTabs') || 'null');
+  return new Set(saved || ALL_TABS.map(t => t[0]));
+}
+
+function applyTabVisibility() {
+  const on = visibleTabs();
+  document.querySelectorAll('#subnav button').forEach(btn => {
+    const tab = btn.dataset.tab;
+    if (tab === 'settings') return;
+    btn.classList.toggle('tab-hidden', !on.has(tab));
+  });
+  const active = document.querySelector('#subnav button.active');
+  if (active && active.classList.contains('tab-hidden')) showTab('settings');
+}
+
+function toggleTabVisibility(tab) {
+  const on = visibleTabs();
+  if (on.has(tab)) on.delete(tab); else on.add(tab);
+  localStorage.setItem('visibleTabs', JSON.stringify([...on]));
+  applyTabVisibility();
+  renderSettings();
+}
+
 function renderSettings() {
   const el = document.getElementById('settings');
   if (!el) return;
@@ -1733,7 +1769,14 @@ function renderSettings() {
       <p class="backup-note">${recent.length ? recent.length + ' recent searches saved on this device.' : 'No recent searches.'}</p>
       <button type="button" onclick="clearSearchHistory(); renderSettings();">Clear History</button>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.38</p>
+    <div class="backup-box">
+      <div class="stat-label" style="margin-bottom:6px;">Visible Tabs</div>
+      <p class="backup-note">Choose which tabs show in the bar. Settings always stays.</p>
+      <div class="tab-toggles">
+        ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
+      </div>
+    </div>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.39</p>
   `;
 }
 
@@ -1799,6 +1842,7 @@ function startLedger() {
     setTimeout(() => renderRecommendations(1), 800);
   }
   render();
+  applyTabVisibility();
 }
 
 if (document.readyState === "loading") {

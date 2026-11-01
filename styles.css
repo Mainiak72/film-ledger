@@ -66,7 +66,26 @@ body {
   line-height: 1.4;
 }
 
-.backup-note a {
+.tab-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tab-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.tab-toggle.on {
+  border-color: var(--accent);
   color: var(--accent);
 }
 
@@ -278,27 +297,25 @@ button:hover {
 
 nav {
   display: flex;
-  gap: 1px;
-  overflow-x: auto;
-  padding: 6px 10px 8px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  padding: 6px 12px 8px;
+  justify-content: center;
 }
-
-nav::-webkit-scrollbar { display: none; }
 
 nav button {
   background: transparent;
   color: var(--muted);
   border: none;
-  padding: 6px 7px;
+  padding: 6px 10px;
   border-radius: 0;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  flex-shrink: 0;
 }
+
+nav button.tab-hidden { display: none; }
 
 nav button.active {
   background: transparent;
