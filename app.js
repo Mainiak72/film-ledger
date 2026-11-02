@@ -965,19 +965,23 @@ function fetchSuggestions(q) {
   const apiKey = localStorage.getItem('tmdbKey') || '';
   const box = document.getElementById('suggestions');
   if (!apiKey) { box.innerHTML = ''; return; }
-  Promise.all([
-    fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(q)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
-    fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(q)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
-  ]).then(([multi, people]) => {
+  const variants = [q, ...titleVariants(q)];
+  const fetches = variants.slice(0, 3).flatMap(v => [
+    fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(v)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
+    fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(v)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
+  ]);
+  Promise.all(fetches).then(results => {
     if (document.getElementById('searchQuery').value.trim() !== q) return;
-    const titles = (multi.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv').slice(0, 5);
-    const persons = (people.results || []).slice(0, 3);
-    const items = [];
-    titles.forEach(m => items.push({ kind: 'title', data: m }));
-    persons.forEach(p => items.push({ kind: 'person', data: p }));
-    if (!items.length) { box.innerHTML = ''; return; }
-    window._suggestions = items;
-    box.innerHTML = items.map((item, i) => {
+    const titles = [];
+    const persons = [];
+    results.forEach((data, i) => {
+      if (i % 2 === 0) titles.push(...(data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv'));
+      else persons.push(...(data.results || []));
+    });
+    const ranked = rankSuggestions(q, uniqueById(titles), uniquePersons(persons));
+    if (!ranked.length) { box.innerHTML = ''; return; }
+    window._suggestions = ranked;
+    box.innerHTML = ranked.map((item, i) => {
       if (item.kind === 'person') {
         const p = item.data;
         const img = p.profile_path
@@ -995,6 +999,30 @@ function fetchSuggestions(q) {
       return `<div class="suggest-item" onclick="pickSuggestion(${i})">${img}<div><div class="title">${escapeHtml(title || '')}</div><div class="suggest-kind">${isTV ? 'TV' : 'Movie'}${year ? ' · ' + year : ''}</div></div></div>`;
     }).join('');
   });
+}
+
+function uniquePersons(list) {
+  const seen = new Set();
+  return list.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+}
+
+function rankSuggestions(query, titles, persons) {
+  const q = query.toLowerCase().trim();
+  const person = persons.find(p => personNameMatches(p, q));
+  const exactTitle = titles.find(m => (m.title || m.name || '').toLowerCase() === q);
+  const items = [];
+  if (person && !exactTitle) items.push({ kind: 'person', data: person });
+  titles
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+    .slice(0, 6)
+    .forEach(m => items.push({ kind: 'title', data: m }));
+  if (!person || exactTitle) {
+    persons
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 2)
+      .forEach(p => { if (!items.some(i => i.kind === 'person' && i.data.id === p.id)) items.push({ kind: 'person', data: p }); });
+  }
+  return items.slice(0, 8);
 }
 
 function pickSuggestion(i) {
@@ -1109,6 +1137,10 @@ function uniqueById(list) {
   });
 }
 
+function byKnown(a, b) {
+  return (b.popularity || 0) - (a.popularity || 0) || creditYear(b) - creditYear(a);
+}
+
 function groupPersonCredits(person, credits) {
   const dept = person.known_for_department || '';
   const cast = credits.cast || [];
@@ -1122,7 +1154,7 @@ function groupPersonCredits(person, credits) {
   const sections = [];
   const used = new Set();
   const add = (label, items) => {
-    const list = uniqueById(items.filter(m => (isMovie(m) || isShow(m)) && !used.has(m.id + ':' + (m.media_type || '')))).sort(byYear);
+    const list = uniqueById(items.filter(m => (isMovie(m) || isShow(m)) && !used.has(m.id + ':' + (m.media_type || '')))).sort(byKnown);
     const movies = list.filter(isMovie);
     const shows = list.filter(isShow);
     const ordered = [...movies, ...shows].slice(0, 20);
@@ -1130,7 +1162,8 @@ function groupPersonCredits(person, credits) {
     if (ordered.length) sections.push({ label, items: ordered });
   };
 
-  if (dept === 'Directing' || crew.some(m => job(m, 'Director'))) {
+  const isDirector = dept === 'Directing' || crew.filter(m => job(m, 'Director')).length >= 2;
+  if (isDirector) {
     add('Directed', crew.filter(m => job(m, 'Director')));
     add('Produced', crew.filter(produced));
     add('Wrote', crew.filter(wrote));
@@ -1227,7 +1260,7 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
       doPersonSearch(query, apiKey, resultsEl);
       return;
     }
-      const filtered = hits.slice(0, 8);
+      const filtered = hits.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 8);
       const totalPages = data.total_pages || 1;
       const note = tried.length ? `<div class="empty" style="margin-bottom:8px;">Showing results for <strong>${escapeHtml(query)}</strong></div>` : '';
       
@@ -1803,7 +1836,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.75</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.76</p>
   `;
 }
 
