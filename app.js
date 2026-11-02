@@ -1072,8 +1072,14 @@ function searchMovies(page = 1) {
     return;
   }
 
-  // Prefer titles. Only fall back to a person when no title matches.
+  // Prefer titles. If the query is a clear person name, show their work instead.
   doTitleSearch(query, page, apiKey, resultsEl);
+}
+
+function titleMatches(m, query) {
+  const title = (m.title || m.name || '').toLowerCase();
+  const q = query.toLowerCase().trim();
+  return title === q || title.startsWith(q + ' ') || title.includes(' ' + q);
 }
 
 function personNameMatches(person, query) {
@@ -1197,19 +1203,29 @@ function doPersonSearch(query, apiKey, resultsEl) {
 }
 
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
-  fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
-    .then(r => r.json())
-    .then(data => {
-      const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
-      if (hits.length === 0 && page === 1) {
-        const next = titleVariants(query).find(v => !tried.includes(v) && v !== query);
-        if (next) {
-          doTitleSearch(next, 1, apiKey, resultsEl, [...tried, query]);
-          return;
-        }
-        doPersonSearch(query, apiKey, resultsEl);
+  const personCheck = page === 1 && tried.length === 0
+    ? fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
+    : Promise.resolve({ results: [] });
+
+  Promise.all([
+    fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`).then(r => r.json()),
+    personCheck
+  ]).then(([data, people]) => {
+    const person = (people.results || []).find(p => personNameMatches(p, query));
+    const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
+    if (person && (hits.length === 0 || !hits.some(m => titleMatches(m, query)))) {
+      showPersonCredits(person, apiKey, resultsEl, query);
+      return;
+    }
+    if (hits.length === 0 && page === 1) {
+      const next = titleVariants(query).find(v => !tried.includes(v) && v !== query);
+      if (next) {
+        doTitleSearch(next, 1, apiKey, resultsEl, [...tried, query]);
         return;
       }
+      doPersonSearch(query, apiKey, resultsEl);
+      return;
+    }
       const filtered = hits.slice(0, 8);
       const totalPages = data.total_pages || 1;
       const note = tried.length ? `<div class="empty" style="margin-bottom:8px;">Showing results for <strong>${escapeHtml(query)}</strong></div>` : '';
@@ -1786,7 +1802,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.73</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.74</p>
   `;
 }
 
