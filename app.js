@@ -1192,7 +1192,7 @@ function groupPersonCredits(person, credits) {
 }
 
 function showPersonCredits(person, apiKey, resultsEl, query) {
-  resultsEl.innerHTML = `<div class="empty" style="margin-bottom:8px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
+  resultsEl.innerHTML = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div><div class="empty" style="margin-bottom:6px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
   fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${apiKey}`)
     .then(r => r.json())
     .then(credits => {
@@ -1202,9 +1202,9 @@ function showPersonCredits(person, apiKey, resultsEl, query) {
         return;
       }
       const flat = [];
-      let html = '';
+      let html = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div><div class="empty" style="margin-bottom:6px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
       sections.forEach(section => {
-        html += `<div class="stat-label" style="margin:12px 4px 6px;">${escapeHtml(section.label)}</div>`;
+        html += `<div class="stat-label" style="margin:10px 4px 4px;">${escapeHtml(section.label)}</div>`;
         section.items.forEach(m => {
           const idx = flat.length;
           flat.push(m);
@@ -1213,12 +1213,12 @@ function showPersonCredits(person, apiKey, resultsEl, query) {
           const year = creditYear(m) || '';
           const role = m.job || m.character || '';
           const poster = m.poster_path
-            ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
-            : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+            ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">`
+            : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
           html += `
-            <div class="card" style="display:flex; align-items:center; padding:8px;">
+            <div class="card" style="display:flex; align-items:center; padding:6px 8px; margin-bottom:6px;">
               ${poster}
-              <div style="flex:1;">
+              <div style="flex:1; min-width:0;">
                 <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
                 <div class="meta">${year}${role ? ' · ' + escapeHtml(role) : ''}</div>
               </div>
@@ -1227,7 +1227,7 @@ function showPersonCredits(person, apiKey, resultsEl, query) {
         });
       });
       window.lastSearchResults = flat;
-      resultsEl.innerHTML += html;
+      resultsEl.innerHTML = html;
     })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
 }
@@ -1847,7 +1847,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.77</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.78</p>
   `;
 }
 

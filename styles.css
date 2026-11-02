@@ -298,12 +298,27 @@ button:hover {
 }
 
 #searchResults {
-  padding: 0 16px 10px;
-  max-height: 52vh;
+  padding: 0 12px 8px;
+  max-height: 48vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #3a3328 transparent;
+}
+
+#searchResults .card {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+#searchResults .title {
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+#searchResults .meta {
+  font-size: 0.72rem;
+  margin-top: 1px;
 }
 
 #searchResults::-webkit-scrollbar {
@@ -328,13 +343,18 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
-  margin: 6px 0 10px;
+  gap: 8px;
+  margin: 4px 0 6px;
   position: sticky;
   top: 0;
   background: var(--bg);
-  padding: 6px 0;
+  padding: 4px 0;
   z-index: 2;
+}
+
+.page-bar button {
+  padding: 6px 16px;
+  font-size: 0.8rem;
 }
 
 .page-bar span {
