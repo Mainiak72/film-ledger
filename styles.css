@@ -931,7 +931,16 @@ select:focus, input:focus, textarea:focus {
   line-height: 1.4;
 }
 
-.svc-info a {
+.trailer-link {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.trailer-link:hover { text-decoration: underline; }
   color: var(--accent);
   margin-left: 6px;
 }

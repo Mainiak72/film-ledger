@@ -354,7 +354,7 @@ function showDetails(id) {
   const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
   
   Promise.all([
-    fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}&language=en-US&append_to_response=credits,release_dates`).then(r => r.json()),
+    fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}&language=en-US&append_to_response=credits,release_dates,videos`).then(r => r.json()),
     fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}/watch/providers?api_key=${apiKey}`).then(r => r.json())
   ]).then(([details, providers]) => {
     const overview = details.overview || 'No description available.';
@@ -371,7 +371,9 @@ function showDetails(id) {
     const writers = (details.credits?.crew || []).filter(c => ['Writer', 'Screenplay', 'Story'].includes(c.job)).map(c => c.name).filter((v, i, a) => a.indexOf(v) === i).slice(0, 5).join(', ') || '—';
     const producers = (details.credits?.crew || []).filter(c => c.job === 'Producer').slice(0, 5).map(c => c.name).join(', ') || '—';
 
-    let originBadge = '';
+    const videos = (details.videos?.results || []).filter(v => v.site === 'YouTube');
+    const trailer = videos.find(v => v.type === 'Trailer' && v.official) || videos.find(v => v.type === 'Trailer') || videos.find(v => v.type === 'Teaser') || videos[0];
+    const trailerLink = trailer ? `<a class="trailer-link" href="https://www.youtube.com/watch?v=${trailer.key}" target="_blank" rel="noopener">▶ ${escapeHtml(trailer.name || 'Trailer')}</a>` : '';
     if (endpoint === 'movie' && details.release_dates?.results) {
       const us = details.release_dates.results.find(r => r.iso_3166_1 === 'US');
       if (us && us.release_dates.some(d => d.type === 3)) originBadge = '<span style="background:#d4af37; color:#000; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Theatrical</span>';
@@ -468,7 +470,7 @@ function showDetails(id) {
         <div style="display:flex; gap:12px; margin-bottom:12px;">
           ${posterBlock}
           <div style="flex:1;">
-            <div style="margin-bottom:8px;">${originBadge}</div>
+            <div style="margin-bottom:8px;">${originBadge}${trailerLink}</div>
             ${includedSection}
           </div>
         </div>
@@ -1817,7 +1819,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.71</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.72</p>
   `;
 }
 
