@@ -1016,6 +1016,8 @@ function pickSuggestion(i) {
 }
 
 function searchMovies(page = 1) {
+  clearTimeout(suggestTimer);
+  document.getElementById('suggestions').innerHTML = '';
   const query = document.getElementById('searchQuery').value.trim();
   const apiKey = localStorage.getItem('tmdbKey') || '';
   if (!query) {
@@ -1792,7 +1794,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.64</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.65</p>
   `;
 }
 
