@@ -1792,7 +1792,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.63</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.64</p>
   `;
 }
 
@@ -1840,7 +1840,14 @@ async function backfillPosters() {
   render();
 }
 
+function sizeTop() {
+  const top = document.querySelector('.sticky-top');
+  if (top) document.documentElement.style.setProperty('--top-h', top.offsetHeight + 'px');
+}
+
 function startLedger() {
+  sizeTop();
+  window.addEventListener('resize', sizeTop);
   const input = document.getElementById("searchQuery");
   if (input && !input.dataset.bound) {
     input.dataset.bound = "1";
