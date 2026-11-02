@@ -270,6 +270,26 @@ button:hover {
   max-height: 52vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3328 transparent;
+}
+
+#searchResults::-webkit-scrollbar {
+  width: 8px;
+}
+
+#searchResults::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#searchResults::-webkit-scrollbar-thumb {
+  background: #3a3328;
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+
+#searchResults::-webkit-scrollbar-thumb:hover {
+  background: #d4af37;
 }
 
 .page-bar {
