@@ -289,54 +289,19 @@ function showSearchDetails(tmdbId, mediaType) {
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) return alert('Add your TMDB key first.');
   const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
-  
   Promise.all([
-    fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${apiKey}&language=en-US&append_to_response=credits`).then(r => r.json()),
+    fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${apiKey}&language=en-US&append_to_response=credits,release_dates,videos`).then(r => r.json()),
     fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}/watch/providers?api_key=${apiKey}`).then(r => r.json())
   ]).then(([details, providers]) => {
-    const title = details.title || details.name;
-    const overview = details.overview || 'No description available.';
-    const releaseDate = details.release_date || details.first_air_date || '—';
-    const cast = (details.credits?.cast || []).slice(0, 8).map(c => c.name).join(', ') || '—';
-    const directors = (details.credits?.crew || []).filter(c => c.job === 'Director').map(c => c.name).join(', ') || '—';
-    const writers = (details.credits?.crew || []).filter(c => ['Writer', 'Screenplay', 'Story'].includes(c.job)).map(c => c.name).filter((v, i, a) => a.indexOf(v) === i).slice(0, 5).join(', ') || '—';
-    const producers = (details.credits?.crew || []).filter(c => c.job === 'Producer').slice(0, 5).map(c => c.name).join(', ') || '—';
-    
-    const usProviders = providers.results?.US || {};
-    const flatrate = usProviders.flatrate || [];
-    let badges = '';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('netflix'))) badges += '<span style="background:#e50914; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Netflix</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('amazon') || p.provider_name.toLowerCase().includes('prime'))) badges += '<span style="background:#00a8e1; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Prime Video</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('disney'))) badges += '<span style="background:#113ccf; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Disney+</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('max') || p.provider_name.toLowerCase().includes('hbo'))) badges += '<span style="background:#6b2c91; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Max</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('hulu'))) badges += '<span style="background:#1ce783; color:#000; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Hulu</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('apple'))) badges += '<span style="background:#000; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Apple TV+</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('paramount'))) badges += '<span style="background:#0064ff; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Paramount+</span>';
-    if (flatrate.some(p => p.provider_name.toLowerCase().includes('peacock'))) badges += '<span style="background:#7B2D8E; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Peacock</span>';
-
-    const modal = document.createElement('div');
-    modal.className = 'sheet';
-    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
-    modal.innerHTML = `
-      <div style="background:#1a1a1a; border-radius:12px; max-width:420px; width:100%; padding:16px; max-height:85vh; overflow-y:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-          <h3 style="font-size:1.1rem;">${escapeHtml(title)}</h3>
-          <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
-        </div>
-        ${badges ? `<div style="margin-bottom:12px;">${badges}</div>` : '<div style="color:#aaa; font-size:0.8rem; margin-bottom:12px;">Not currently on major streaming services</div>'}
-        <p style="color:#ddd; font-size:0.9rem; line-height:1.5; margin-bottom:14px;">${escapeHtml(overview)}</p>
-        <div style="font-size:0.8rem; color:#aaa; line-height:1.6;">
-          <div><strong style="color:#ddd;">Release:</strong> ${releaseDate}</div>
-          <div><strong style="color:#ddd;">Director:</strong> ${escapeHtml(directors)}</div>
-          <div><strong style="color:#ddd;">Writer:</strong> ${escapeHtml(writers)}</div>
-          <div><strong style="color:#ddd;">Producers:</strong> ${escapeHtml(producers)}</div>
-          <div><strong style="color:#ddd;">Cast:</strong> ${escapeHtml(cast)}</div>
-        </div>
-      </div>
-    `;
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.body.appendChild(modal);
-  });
+    if (!details || details.success === false) { alert('Could not load details.'); return; }
+    const tempId = 'search-' + tmdbId;
+    const existing = movies.find(x => x.tmdbId === Number(tmdbId) && (x.mediaType || 'movie') === endpoint);
+    if (existing) { showDetails(existing.id); return; }
+    const temp = { id: tempId, tmdbId: Number(tmdbId), mediaType: endpoint, title: details.title || details.name, poster: details.poster_path, status: 'search' };
+    movies.push(temp);
+    showDetails(tempId);
+    setTimeout(() => { movies = movies.filter(x => x.id !== tempId); }, 0);
+  }).catch(() => alert('Could not load details.'));
 }
 
 function showDetails(id) {
@@ -374,6 +339,8 @@ function showDetails(id) {
     const videos = (details.videos?.results || []).filter(v => v.site === 'YouTube');
     const trailer = videos.find(v => v.type === 'Trailer' && v.official) || videos.find(v => v.type === 'Trailer') || videos.find(v => v.type === 'Teaser') || videos[0];
     const trailerLink = trailer ? `<a class="trailer-link" href="https://www.youtube.com/watch?v=${trailer.key}" target="_blank" rel="noopener">▶ ${escapeHtml(trailer.name || 'Trailer')}</a>` : '';
+
+    let originBadge = '';
     if (endpoint === 'movie' && details.release_dates?.results) {
       const us = details.release_dates.results.find(r => r.iso_3166_1 === 'US');
       if (us && us.release_dates.some(d => d.type === 3)) originBadge = '<span style="background:#d4af37; color:#000; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Theatrical</span>';
@@ -465,7 +432,7 @@ function showDetails(id) {
       <div style="background:#1a1a1a; border-radius:12px; max-width:420px; width:100%; padding:16px; max-height:85vh; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
           <h3 style="font-size:1.1rem;">${escapeHtml(m.title)}</h3>
-          <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
+          <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
         <div style="display:flex; gap:12px; margin-bottom:12px;">
           ${posterBlock}
@@ -1819,7 +1786,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.72</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.73</p>
   `;
 }
 
