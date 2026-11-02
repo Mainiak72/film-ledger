@@ -47,7 +47,7 @@ function tabHead(titleHtml, tabId, refreshKind) {
 
 function libraryButtons(m, rank) {
   const del = rank ? '' : `<button onclick="deleteMovie('${m.id}')" class="del">Del</button>`;
-  const rate = rank ? '' : `<button onclick="editRating('${m.id}')">Rate</button>`;
+  const rate = rank ? '' : `<button onclick="editRating('${m.id}')">${m.rating != null ? 'Re-rate' : 'Rate'}</button>`;
   if (m.status === 'watched') {
     const fav = `<button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>`;
     return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${del}`;
@@ -471,7 +471,7 @@ function showDetails(id) {
         </div>
         <div style="border-top:1px solid #333; padding-top:12px;">
           <div class="item-actions" style="margin-bottom:12px;">
-            <button onclick="editRating('${m.id}')">Re-rate</button>
+            <button onclick="editRating('${m.id}')">${m.rating != null ? 'Re-rate' : 'Rate'}</button>
             <button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>
             ${m.status === 'watched' && m.rating != null ? topActions(m) : ''}
             <button onclick="deleteMovie('${m.id}')" class="del">Delete</button>
@@ -1793,7 +1793,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.60</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.61</p>
   `;
 }
 
