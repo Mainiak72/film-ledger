@@ -443,14 +443,23 @@ function showDetails(id) {
     const modal = document.createElement('div');
     modal.className = 'sheet';
     modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+    const posterBlock = m.poster
+      ? `<img src="https://image.tmdb.org/t/p/w342${m.poster}" alt="" style="width:92px; height:138px; object-fit:cover; border-radius:6px; flex-shrink:0;">`
+      : '<div style="width:92px; height:138px; background:#222; border-radius:6px; flex-shrink:0;"></div>';
+
     modal.innerHTML = `
       <div style="background:#1a1a1a; border-radius:12px; max-width:420px; width:100%; padding:16px; max-height:85vh; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
           <h3 style="font-size:1.1rem;">${escapeHtml(m.title)}</h3>
           <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
-        <div style="margin-bottom:12px;">${originBadge}</div>
-        ${includedSection}
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+          ${posterBlock}
+          <div style="flex:1;">
+            <div style="margin-bottom:8px;">${originBadge}</div>
+            ${includedSection}
+          </div>
+        </div>
         <p style="color:#ddd; font-size:0.9rem; line-height:1.5; margin-bottom:14px;">${escapeHtml(overview)}</p>
         <div style="display:flex; gap:10px; margin-bottom:14px; font-size:0.75rem;">
           <div style="flex:1; background:#222; padding:8px; border-radius:8px;">
@@ -1794,7 +1803,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.66</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.67</p>
   `;
 }
 
