@@ -267,6 +267,27 @@ button:hover {
 
 #searchResults {
   padding: 0 16px 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.page-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 10px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding: 6px 0;
+  z-index: 2;
+}
+
+.page-bar span {
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .mode-switch {

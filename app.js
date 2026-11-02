@@ -1271,11 +1271,8 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
           `;
         }).join('');
         if (totalPages > 1) {
-          html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:10px;">
-            ${page > 1 ? `<button onclick="searchMovies(${page - 1})" style="font-size:0.75rem; padding:6px 12px;">Prev</button>` : ''}
-            <span style="color:#aaa; font-size:0.8rem; align-self:center;">Page ${page} of ${totalPages}</span>
-            ${page < totalPages ? `<button onclick="searchMovies(${page + 1})" style="font-size:0.75rem; padding:6px 12px;">Next</button>` : ''}
-          </div>`;
+          const bar = pageBar(page, totalPages);
+          html = bar + html + bar;
         }
         resultsEl.innerHTML = note + html;
       });
@@ -1283,6 +1280,14 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
     .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
 }
 
+function pageBar(page, totalPages) {
+  if (totalPages <= 1) return '';
+  return `<div class="page-bar">
+    ${page > 1 ? `<button type="button" onclick="searchMovies(${page - 1})">Prev</button>` : '<span></span>'}
+    <span>Page ${page} of ${totalPages}</span>
+    ${page < totalPages ? `<button type="button" onclick="searchMovies(${page + 1})">Next</button>` : '<span></span>'}
+  </div>`;
+}
 function titleVariants(query) {
   const fixes = { resevior: 'reservoir', reservior: 'reservoir', resevoir: 'reservoir', reciev: 'receiv' };
   const words = query.toLowerCase().split(/\s+/);
@@ -1333,14 +1338,8 @@ function renderDiscoverResults(data, resultsEl, page, endpoint, apiKey) {
     `;
   }).join('');
   const totalPages = data.total_pages || 1;
-  if (totalPages > 1) {
-    html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:10px;">
-      ${page > 1 ? `<button onclick="searchMovies(${page - 1})" style="font-size:0.75rem; padding:6px 12px;">Prev</button>` : ''}
-      <span style="color:#aaa; font-size:0.8rem; align-self:center;">Page ${page} of ${totalPages}</span>
-      ${page < totalPages ? `<button onclick="searchMovies(${page + 1})" style="font-size:0.75rem; padding:6px 12px;">Next</button>` : ''}
-    </div>`;
-  }
-  resultsEl.innerHTML = html;
+  const bar = pageBar(page, totalPages);
+  resultsEl.innerHTML = bar + html + bar;
 }
 
 function renderPersonResults(items, resultsEl, apiKey) {
@@ -1793,7 +1792,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.61</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.62</p>
   `;
 }
 
