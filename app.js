@@ -426,6 +426,17 @@ function showDetails(id) {
       }
     });
 
+    const serviceLinks = {
+      'prime video': ['Included with an Amazon Prime or Prime Video subscription.', 'https://www.primevideo.com'],
+      'max': ['Included with a Max subscription.', 'https://www.max.com'],
+      'netflix': ['Included with a Netflix subscription.', 'https://www.netflix.com'],
+      'disney+': ['Included with a Disney+ subscription.', 'https://www.disneyplus.com'],
+      'hulu': ['Included with a Hulu subscription.', 'https://www.hulu.com'],
+      'peacock': ['Included with a Peacock subscription.', 'https://www.peacocktv.com'],
+      'paramount+': ['Included with a Paramount+ subscription.', 'https://www.paramountplus.com'],
+      'apple tv+': ['Included with an Apple TV+ subscription.', 'https://tv.apple.com'],
+      'roku': ['Available on Roku Channel.', 'https://therokuchannel.roku.com']
+    };
     let includedBubbles = '';
     uniqueProviders.forEach(p => {
       const name = p.provider_name.toLowerCase();
@@ -434,9 +445,10 @@ function showDetails(id) {
       for (const key in colorMap) {
         if (name.includes(key)) { color = colorMap[key]; textColor = textColorMap[key] || '#fff'; break; }
       }
-      includedBubbles += `<span style="background:${color}; color:${textColor}; padding:4px 10px; border-radius:14px; font-size:0.75rem; font-weight:600; margin:2px 4px 2px 0; display:inline-block;">${escapeHtml(p.provider_name)}</span>`;
+      const info = serviceLinks[name] || [`Included with a ${p.provider_name} subscription.`, ''];
+      includedBubbles += `<button type="button" class="svc-bubble" style="background:${color}; color:${textColor};" onclick="showServiceInfo(this, '${escapeHtml(info[0]).replace(/'/g, "\\'")}', '${info[1]}')">${escapeHtml(p.provider_name)}</button>`;
     });
-    const includedSection = includedBubbles ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; gap:4px;"><span style="color:#aaa; font-size:0.75rem; margin-right:4px;">With subscription:</span>${includedBubbles}</div>` : '';
+    const includedSection = includedBubbles ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; gap:4px;"><span style="color:#aaa; font-size:0.75rem; margin-right:4px;">With subscription:</span>${includedBubbles}</div><div id="svcInfo" class="svc-info" hidden></div>` : '';
 
     const makeList = (arr) => arr.length ? arr.map(p => `<div style="font-size:0.8rem; margin:2px 0;">${escapeHtml(p.provider_name)}</div>`).join('') : '<div style="color:#666; font-size:0.75rem;">—</div>';
 
@@ -494,6 +506,15 @@ function showDetails(id) {
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
   }).catch(() => alert('Could not load details.'));
+}
+
+function showServiceInfo(btn, text, url) {
+  const box = btn.closest('.sheet')?.querySelector('#svcInfo');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = url
+    ? `${escapeHtml(text)} <a href="${url}" target="_blank" rel="noopener">Open ${escapeHtml(btn.textContent)}</a>`
+    : escapeHtml(text);
 }
 
 function saveComment(id) {
@@ -1796,7 +1817,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.70</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.71</p>
   `;
 }
 
