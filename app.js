@@ -50,7 +50,7 @@ function libraryButtons(m, rank) {
   const rate = rank ? '' : `<button onclick="editRating('${m.id}')">Rate</button>`;
   if (m.status === 'watched') {
     const fav = `<button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>`;
-    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${topActions(m, rank)}${del}`;
+    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${del}`;
   }
   return `<button onclick="showDetails('${m.id}')">Details</button>`
     + (m.status !== 'watchlist' ? `<button onclick="setStatus('${m.id}', 'watchlist')">Watchlist</button>` : '')
@@ -94,8 +94,8 @@ function refreshTopSets() {
   window._decadeIds = decadeIds;
 }
 
-function topActions(m, rank) {
-  if (rank || m.status !== 'watched' || m.rating == null) return '';
+function topActions(m) {
+  if (m.status !== 'watched' || m.rating == null) return '';
   const inAll = window._allTimeIds && window._allTimeIds.has(m.id);
   const dec = m.year ? Math.floor(m.year / 10) * 10 : null;
   const inDec = dec && window._decadeIds && window._decadeIds.has(m.id);
@@ -350,6 +350,7 @@ function showDetails(id) {
     alert('Add your TMDB API key first.');
     return;
   }
+  refreshTopSets();
   const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
   
   Promise.all([
@@ -1792,7 +1793,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.59</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.60</p>
   `;
 }
 
