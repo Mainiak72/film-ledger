@@ -1,9 +1,9 @@
-const CACHE_NAME = 'film-ledger-v5.79';
+const CACHE_NAME = 'film-ledger-v5.80';
 const urlsToCache = [
   './',
   './index.html',
   './styles.css',
-  './app.js?v=579',
+  './app.js?v=580',
   './manifest.json',
   './film-ledger-title.png?v=557'
 ];
