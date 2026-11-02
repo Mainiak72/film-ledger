@@ -75,6 +75,11 @@ body {
   gap: 8px;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 .tab-toggle {
   display: flex;
   align-items: center;
@@ -85,11 +90,15 @@ body {
   color: var(--muted);
   cursor: pointer;
   font-size: 0.82rem;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: none;
 }
 
 .tab-toggle.on {
   border-color: var(--accent);
   color: var(--accent);
+  background: rgba(212, 175, 55, 0.12);
 }
 
 #settingsBtn {
@@ -160,7 +169,10 @@ body {
 
 .search-bar input[type="text"],
 .search-bar input[type="password"],
-#searchQuery {
+#searchQuery,
+input, select, textarea {
+  font-size: 16px;
+}
   flex: 1;
   background: var(--surface);
   color: var(--text);

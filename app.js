@@ -1082,23 +1082,7 @@ function searchMovies(page = 1) {
     return;
   }
 
-  // One word is usually a person (Nolan, Tarantino). Two or more is usually a title.
-  const words = query.split(/\s+/).filter(Boolean);
-  if (words.length === 1 && /[a-z]/i.test(query)) {
-    fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=1`)
-      .then(r => r.json())
-      .then(personData => {
-        const person = (personData.results || []).find(p => personNameMatches(p, query));
-        if (person) {
-          showPersonCredits(person, apiKey, resultsEl, query);
-          return;
-        }
-        doTitleSearch(query, page, apiKey, resultsEl);
-      })
-      .catch(() => doTitleSearch(query, page, apiKey, resultsEl));
-    return;
-  }
-
+  // Prefer titles. Only fall back to a person when no title matches.
   doTitleSearch(query, page, apiKey, resultsEl);
 }
 
@@ -1768,7 +1752,8 @@ function toggleTabVisibility(tab) {
   if (on.has(tab)) on.delete(tab); else on.add(tab);
   localStorage.setItem('visibleTabs', JSON.stringify([...on]));
   applyTabVisibility();
-  renderSettings();
+  const btn = document.querySelector(`.tab-toggle[data-tab="${tab}"]`);
+  if (btn) btn.classList.toggle('on', on.has(tab));
 }
 
 function renderSettings() {
@@ -1800,10 +1785,10 @@ function renderSettings() {
       <div class="stat-label" style="margin-bottom:6px;">Visible Tabs</div>
       <p class="backup-note">Choose which tabs show in the bar. Settings always stays.</p>
       <div class="tab-toggles">
-        ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
+        ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.67</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.68</p>
   `;
 }
 
