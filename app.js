@@ -1125,7 +1125,7 @@ function groupPersonCredits(person, credits) {
     const list = uniqueById(items.filter(m => (isMovie(m) || isShow(m)) && !used.has(m.id + ':' + (m.media_type || '')))).sort(byYear);
     const movies = list.filter(isMovie);
     const shows = list.filter(isShow);
-    const ordered = [...movies, ...shows].slice(0, 12);
+    const ordered = [...movies, ...shows].slice(0, 20);
     ordered.forEach(m => used.add(m.id + ':' + (m.media_type || '')));
     if (ordered.length) sections.push({ label, items: ordered });
   };
@@ -1213,7 +1213,8 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   ]).then(([data, people]) => {
     const person = (people.results || []).find(p => personNameMatches(p, query));
     const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
-    if (person && (hits.length === 0 || !hits.some(m => titleMatches(m, query)))) {
+    const exactTitle = hits.some(m => (m.title || m.name || '').toLowerCase() === query.toLowerCase());
+    if (person && !exactTitle) {
       showPersonCredits(person, apiKey, resultsEl, query);
       return;
     }
@@ -1802,7 +1803,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.74</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.75</p>
   `;
 }
 
