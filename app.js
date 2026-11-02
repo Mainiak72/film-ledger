@@ -1008,10 +1008,11 @@ function uniquePersons(list) {
 
 function rankSuggestions(query, titles, persons) {
   const q = query.toLowerCase().trim();
-  const person = persons.find(p => personNameMatches(p, q));
+  const person = bestPersonMatch(persons, q);
   const exactTitle = titles.find(m => (m.title || m.name || '').toLowerCase() === q);
+  const singleWord = q.split(/\s+/).length === 1;
   const items = [];
-  if (person && !exactTitle) items.push({ kind: 'person', data: person });
+  if (person && (!exactTitle || singleWord)) items.push({ kind: 'person', data: person });
   titles
     .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
     .slice(0, 6)
@@ -1112,10 +1113,19 @@ function titleMatches(m, query) {
 
 function personNameMatches(person, query) {
   const q = query.toLowerCase().trim();
-  const parts = (person.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const name = (person.name || '').toLowerCase();
+  const parts = name.split(/\s+/).filter(Boolean);
   if (!parts.length) return false;
-  if (parts.join(' ') === q) return true;
-  return parts.some(p => p === q || (q.length >= 4 && p.startsWith(q)));
+  if (name === q) return true;
+  if (parts.some(p => p === q)) return true;
+  if (q.length >= 4 && parts.some(p => p.startsWith(q))) return true;
+  return false;
+}
+
+function bestPersonMatch(people, query) {
+  const matches = (people || []).filter(p => personNameMatches(p, query));
+  if (!matches.length) return null;
+  return matches.sort((a, b) => (b.popularity || 0) - (a.popularity || 0))[0];
 }
 
 function creditYear(m) {
@@ -1244,10 +1254,11 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
     fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`).then(r => r.json()),
     personCheck
   ]).then(([data, people]) => {
-    const person = (people.results || []).find(p => personNameMatches(p, query));
+    const person = bestPersonMatch(people.results, query);
     const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
     const exactTitle = hits.some(m => (m.title || m.name || '').toLowerCase() === query.toLowerCase());
-    if (person && !exactTitle) {
+    const singleWord = query.trim().split(/\s+/).length === 1;
+    if (person && (!exactTitle || singleWord)) {
       showPersonCredits(person, apiKey, resultsEl, query);
       return;
     }
@@ -1836,7 +1847,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.76</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.77</p>
   `;
 }
 
