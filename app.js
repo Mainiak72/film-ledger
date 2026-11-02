@@ -1269,10 +1269,17 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
           const bar = pageBar(page, totalPages);
           html = bar + html + bar;
         }
-        resultsEl.innerHTML = note + html;
+        const done = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div>`;
+        resultsEl.innerHTML = done + note + html;
       });
     })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+}
+
+function clearResults() {
+  document.getElementById('searchResults').innerHTML = '';
+  document.getElementById('searchQuery').value = '';
+  document.getElementById('suggestions').innerHTML = '';
 }
 
 function pageBar(page, totalPages) {
@@ -1334,7 +1341,8 @@ function renderDiscoverResults(data, resultsEl, page, endpoint, apiKey) {
   }).join('');
   const totalPages = data.total_pages || 1;
   const bar = pageBar(page, totalPages);
-  resultsEl.innerHTML = bar + html + bar;
+  const done = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div>`;
+  resultsEl.innerHTML = done + bar + html + bar;
 }
 
 function renderPersonResults(items, resultsEl, apiKey) {
@@ -1360,7 +1368,7 @@ function renderPersonResults(items, resultsEl, apiKey) {
       </div>
     `;
   }).join('');
-  resultsEl.innerHTML += html;
+  resultsEl.innerHTML = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div>` + html;
 }
 
 
@@ -1788,7 +1796,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.68</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.69</p>
   `;
 }
 
