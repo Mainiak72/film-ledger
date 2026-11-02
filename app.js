@@ -1794,7 +1794,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.65</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.66</p>
   `;
 }
 

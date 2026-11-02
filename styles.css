@@ -220,11 +220,13 @@ button:hover {
   border-radius: var(--radius);
 }
 
-.backup-note {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
-  margin-bottom: 10px;
+.backup-note a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.backup-note a:hover {
+  text-decoration: underline;
 }
 
 .backup-actions {
