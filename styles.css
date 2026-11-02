@@ -169,19 +169,22 @@ html {
 
 .search-bar input[type="text"],
 .search-bar input[type="password"],
-#searchQuery,
-input, select, textarea {
-  font-size: 16px;
-}
-  flex: 1;
+#searchQuery {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   padding: 11px 14px;
   border-radius: 10px;
-  font-size: 0.95rem;
+  font-size: 16px;
   outline: none;
   transition: border-color 0.15s;
+}
+
+input, select, textarea {
+  font-size: 16px;
 }
 
 .search-bar input:focus {
@@ -889,7 +892,7 @@ select:focus, input:focus, textarea:focus {
     gap: 18px;
   }
   .container { padding: 24px 32px 70px; }
-  .search-bar { max-width: 720px; margin-left: auto; margin-right: auto; }
+  .search-bar { width: 100%; }
   .mode-switch { max-width: 480px; margin-left: auto; margin-right: auto; }
   nav { justify-content: center; padding-left: 24px; padding-right: 24px; }
   .brand { padding-top: 12px; }
