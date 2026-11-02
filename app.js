@@ -46,15 +46,16 @@ function tabHead(titleHtml, tabId, refreshKind) {
 }
 
 function libraryButtons(m, rank) {
-  const del = `<button onclick="deleteMovie('${m.id}')" class="del">Del</button>`;
+  const del = rank ? '' : `<button onclick="deleteMovie('${m.id}')" class="del">Del</button>`;
+  const rate = rank ? '' : `<button onclick="editRating('${m.id}')">Rate</button>`;
   if (m.status === 'watched') {
     const fav = `<button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>`;
-    return `<button onclick="showDetails('${m.id}')">Details</button><button onclick="editRating('${m.id}')">Rate</button>${fav}${topActions(m, rank)}${del}`;
+    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${topActions(m, rank)}${del}`;
   }
   return `<button onclick="showDetails('${m.id}')">Details</button>`
     + (m.status !== 'watchlist' ? `<button onclick="setStatus('${m.id}', 'watchlist')">Watchlist</button>` : '')
     + (m.status !== 'watching' ? `<button onclick="setStatus('${m.id}', 'watching')">Watching</button>` : '')
-    + `<button onclick="editRating('${m.id}')">Rate</button>${del}`;
+    + rate + del;
 }
 function viewToggle(tabId) {
   const mode = getViewMode(tabId);
@@ -469,6 +470,7 @@ function showDetails(id) {
         </div>
         <div style="border-top:1px solid #333; padding-top:12px;">
           <div class="item-actions" style="margin-bottom:12px;">
+            <button onclick="editRating('${m.id}')">Re-rate</button>
             <button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>
             ${m.status === 'watched' && m.rating != null ? topActions(m) : ''}
             <button onclick="deleteMovie('${m.id}')" class="del">Delete</button>
@@ -1790,7 +1792,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.58</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.59</p>
   `;
 }
 
