@@ -1215,14 +1215,19 @@ function showPersonCredits(person, apiKey, resultsEl, query) {
           const poster = m.poster_path
             ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">`
             : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+          const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === (m.media_type || 'movie'));
+          const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : '';
           html += `
-            <div class="card" style="display:flex; align-items:center; padding:6px 8px; margin-bottom:6px;">
+            <div class="card" style="display:flex; align-items:center; padding:6px 8px; margin-bottom:6px;${existing ? ' border-left:4px solid #4ade80; background:#1a2e1a;' : ''}">
               ${poster}
               <div style="flex:1; min-width:0;">
-                <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
+                <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span>${statusLabel}</div>
                 <div class="meta">${year}${role ? ' · ' + escapeHtml(role) : ''}</div>
               </div>
-              <button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>
+              ${existing
+                ? `<button type="button" disabled style="font-size:0.7rem; padding:4px 8px; background:#166534; border-color:#166534; color:#fff;">Added</button>`
+                : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
+              }
             </div>`;
         });
       });
@@ -1847,7 +1852,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.78</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.79</p>
   `;
 }
 
