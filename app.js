@@ -38,8 +38,6 @@ function setViewMode(tabId, mode) {
 function tabHead(titleHtml, tabId, refreshKind) {
   const refresh = refreshKind === 'seasonal'
     ? `<button type="button" class="refresh-btn" onclick="renderSeasonal(seasonalPage + 1)">Refresh</button>`
-    : refreshKind === 'recs'
-    ? `<button type="button" class="refresh-btn" onclick="renderRecommendations(recsPage + 1)">Refresh</button>`
     : '';
   return `<div class="tab-head"><div class="tab-title">${titleHtml}</div><div class="tab-tools">${viewToggle(tabId)}${refresh}</div></div>`;
 }
@@ -209,7 +207,6 @@ function render() {
   renderDecades();
   renderLeastFavorite();
   renderSeasonal(seasonalPage);
-  renderRecommendations(recsPage);
   renderStats();
   renderSettings();
 }
@@ -224,8 +221,8 @@ function renderList(tabId, filter) {
   let html = tabHead(`<span class="tab-count">${list.length} total</span>`, tabId);
   if (searchable) {
     html += `<div style="margin-bottom:12px; display:flex; gap:6px;">
-      <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; background:#222; color:white; border:1px solid #2a2a2a; padding:10px; border-radius:8px;">
-      ${tabId === 'watchlist' ? `<select id="watchlistGenre" onchange="filterTab('watchlist')" style="background:#222; color:white; border:1px solid #2a2a2a; padding:10px; border-radius:8px;"><option value="">All genres</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select>` : ''}
+      <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
+      ${tabId === 'watchlist' ? `<select id="watchlistGenre" onchange="filterTab('watchlist')" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;"><option value="">All genres</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select>` : ''}
     </div><div id="${tabId}List" class="list-container ${view}">`;
   } else {
     html += `<div class="list-container ${view}">`;
@@ -714,12 +711,11 @@ const GENRE_MAP = {
 function freeLinks(title) {
   const q = encodeURIComponent(title);
   return [
-    ['YouTube', `https://www.youtube.com/results?search_query=${q}+full`],
+    ['YouTube', `https://www.youtube.com/results?search_query=${q}+full+movie`],
     ['Internet Archive', `https://archive.org/search.php?query=${q}`],
     ['Plex', `https://watch.plex.tv/search?q=${q}`],
     ['Tubi', `https://tubitv.com/search/${q}`],
-    ['Pluto', `https://pluto.tv/search?q=${q}`],
-    ['Freevee', `https://www.amazon.com/s?k=${q}&i=instant-video`]
+    ['Pluto', `https://pluto.tv/search?q=${q}`]
   ];
 }
 function freeLinksHtml(title) {
@@ -1699,7 +1695,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.82</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.83</p>
   `;
 }
 
