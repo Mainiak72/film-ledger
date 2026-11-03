@@ -429,47 +429,42 @@ function showDetails(id) {
       ? `<img src="https://image.tmdb.org/t/p/w342${m.poster}" alt="" style="width:92px; height:138px; object-fit:cover; border-radius:6px; flex-shrink:0;">`
       : '<div style="width:92px; height:138px; background:#222; border-radius:6px; flex-shrink:0;"></div>';
 
+    const links = freeLinks(m.title);
+    const bestFree = links[0];
+    const otherFree = links.slice(1);
+    const isFree = free.length > 0;
+    const halo = isFree ? 'box-shadow:0 0 0 1px #d4af37;' : '';
+
     modal.innerHTML = `
-      <div style="background:#1a1a1a; border-radius:12px; max-width:420px; width:100%; padding:16px; max-height:85vh; overflow-y:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-          <h3 style="font-size:1.1rem;">${escapeHtml(m.title)}</h3>
+      <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:380px; width:100%; padding:14px; max-height:85vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h3 style="font-size:1rem;">${escapeHtml(m.title)}</h3>
           <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
-        <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
           ${posterBlock}
           <div style="flex:1;">
-            <div style="margin-bottom:8px;">${originBadge}${trailerLink}</div>
-            ${includedSection}
+            <div style="margin-bottom:6px;">${originBadge}${trailerLink}</div>
+            <a href="${bestFree[1]}" target="_blank" rel="noopener" style="display:block; background:#d4af37; color:#1a1408; text-align:center; padding:8px; border-radius:8px; font-weight:700; text-decoration:none; font-size:0.85rem;">Watch Free</a>
           </div>
         </div>
-        <p style="color:#ddd; font-size:0.9rem; line-height:1.5; margin-bottom:14px;">${escapeHtml(overview)}</p>
-        <div style="display:flex; gap:10px; margin-bottom:14px; font-size:0.75rem;">
-          <div style="flex:1; background:#222; padding:8px; border-radius:8px;">
-            <div style="font-weight:600; color:#f59e0b; margin-bottom:4px;">Rent</div>
-            ${makeList(rent)}
-          </div>
-          <div style="flex:1; background:#222; padding:8px; border-radius:8px;">
-            <div style="font-weight:600; color:#6b7280; margin-bottom:4px;">Buy</div>
-            ${makeList(buy)}
-          </div>
+        <p style="color:#ddd; font-size:0.85rem; line-height:1.4; margin-bottom:10px;">${escapeHtml(overview)}</p>
+        <div style="font-size:0.75rem; color:#aaa; margin-bottom:10px;">
+          <div>${releaseDate} · ${escapeHtml(directors)}</div>
+          <div>${escapeHtml(cast)}</div>
         </div>
-        <div style="font-size:0.8rem; color:#aaa; line-height:1.6; margin-bottom:14px;">
-          <div><strong style="color:#ddd;">Release:</strong> ${releaseDate}</div>
-          <div><strong style="color:#ddd;">Director:</strong> ${escapeHtml(directors)}</div>
-          <div><strong style="color:#ddd;">Writer:</strong> ${escapeHtml(writers)}</div>
-          <div><strong style="color:#ddd;">Producers:</strong> ${escapeHtml(producers)}</div>
-          <div><strong style="color:#ddd;">Cast:</strong> ${escapeHtml(cast)}</div>
+        <div style="font-size:0.7rem; color:#888; margin-bottom:10px;">
+          Also free: ${otherFree.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
         </div>
-        <div style="border-top:1px solid #333; padding-top:12px;">
-          <div class="item-actions" style="margin-bottom:12px;">
+        <div style="border-top:1px solid #2e2820; padding-top:10px;">
+          <div class="item-actions" style="margin-bottom:8px;">
             <button onclick="editRating('${m.id}')">${m.rating != null ? 'Re-rate' : 'Rate'}</button>
             <button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>
             ${m.status === 'watched' && m.rating != null ? topActions(m) : ''}
             <button onclick="deleteMovie('${m.id}')" class="del">Delete</button>
           </div>
-          <div style="font-weight:600; color:#d4af37; font-size:0.85rem; margin-bottom:6px;">Your Comment</div>
-          <textarea id="commentInput" placeholder="Leave a note about this..." style="width:100%; min-height:60px; background:#222; color:#fff; border:1px solid #333; border-radius:8px; padding:8px; font-size:0.85rem; resize:vertical;">${escapeHtml(m.notes || '')}</textarea>
-          <button onclick="saveComment('${m.id}')" style="margin-top:6px;">Save Comment</button>
+          <textarea id="commentInput" placeholder="Note..." style="width:100%; min-height:40px; background:#141210; color:#f5f0e6; border:1px solid #2e2820; border-radius:6px; padding:6px; font-size:0.8rem;">${escapeHtml(m.notes || '')}</textarea>
+          <button onclick="saveComment('${m.id}')" style="margin-top:4px; font-size:0.75rem;">Save</button>
         </div>
       </div>
     `;
@@ -751,14 +746,14 @@ function renderSeasonal(page = 1) {
   else if (discoverMode === 'free') label = 'Free to Watch';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  const freeParam = discoverMode === 'free' ? '&with_watch_monetization_types=free' : '';
+  const freeParam = discoverMode === 'free' ? '&with_watch_providers=8|9|10|11|12|13&watch_region=US' : '';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false${freeParam}`)
     .then(r => r.json()).then(data => {
       const results = (data.results || []).slice(0, 10);
       if (!results.length) { el.innerHTML = discoverFilters() + `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
       const view = getViewMode('seasonal');
       const free = discoverMode === 'free';
-      const halo = free ? ' style="box-shadow:0 0 0 2px #d4af37, 0 0 12px rgba(212,175,55,0.4);"' : '';
+      const halo = free ? ' style="box-shadow:0 0 0 1px #d4af37;"' : '';
       el.innerHTML = discoverFilters() + tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -1702,7 +1697,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.84</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.85</p>
   `;
 }
 
