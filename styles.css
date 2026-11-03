@@ -551,7 +551,40 @@ nav button.active {
   color: #1a1408;
 }
 
-.tab-head {
+.discover-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.discover-filters button, .discover-filters select {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.discover-filters button.on {
+  background: var(--accent);
+  color: #1a1408;
+  border-color: var(--accent);
+}
+.free-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.free-links a {
+  font-size: 0.68rem;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+}
   display: flex;
   flex-wrap: wrap;
   align-items: center;
