@@ -756,16 +756,23 @@ function renderSeasonal(page = 1) {
     .then(r => r.json()).then(data => {
       const results = (data.results || []).slice(0, 10);
       if (!results.length) { el.innerHTML = discoverFilters() + `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
-      el.innerHTML = discoverFilters() + tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + results.map(m => {
+      const view = getViewMode('seasonal');
+      const free = discoverMode === 'free';
+      const halo = free ? ' style="box-shadow:0 0 0 2px #d4af37, 0 0 12px rgba(212,175,55,0.4);"' : '';
+      el.innerHTML = discoverFilters() + tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
         const posterPath = m.poster_path || '';
         const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
         const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
         const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
-        const links = discoverMode === 'free' ? freeLinksHtml(title) : '';
-        return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>'}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
-      }).join('');
+        const links = free ? freeLinksHtml(title) : '';
+        const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster"${halo}>` : `<div class="poster poster-placeholder"${halo}></div>`;
+        const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;"${halo}>` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"${halo}></div>`;
+        if (view === 'bullet') return `<div class="bullet-item"${halo} onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
+        if (view === 'large') return `<div class="poster-card"${halo}><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
+        return `<div class="card" style="padding:8px;"${halo}><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+      }).join('') + '</div>';
     }).catch(() => el.innerHTML = discoverFilters() + '<div class="empty">Failed to load.</div>');
 }
 function renderRecommendations(page = 1) {
@@ -1695,7 +1702,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.83</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.84</p>
   `;
 }
 
