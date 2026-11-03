@@ -746,14 +746,12 @@ function renderSeasonal(page = 1) {
   else if (discoverMode === 'free') label = 'Free to Watch';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  const freeParam = discoverMode === 'free' ? '&with_watch_providers=8|9|10|11|12|13&watch_region=US' : '';
+  const freeParam = discoverMode === 'free' ? '&with_watch_providers=73|300|538&watch_region=US' : '';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false${freeParam}`)
     .then(r => r.json()).then(data => {
       const results = (data.results || []).slice(0, 10);
       if (!results.length) { el.innerHTML = discoverFilters() + `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
-      const view = getViewMode('seasonal');
-      const free = discoverMode === 'free';
-      const halo = free ? ' style="box-shadow:0 0 0 1px #d4af37;"' : '';
+      const halo = free ? 'box-shadow:0 0 0 1px #d4af37;' : '';
       el.innerHTML = discoverFilters() + tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -762,11 +760,11 @@ function renderSeasonal(page = 1) {
         const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
         const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
         const links = free ? freeLinksHtml(title) : '';
-        const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster"${halo}>` : `<div class="poster poster-placeholder"${halo}></div>`;
-        const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;"${halo}>` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"${halo}></div>`;
-        if (view === 'bullet') return `<div class="bullet-item"${halo} onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
-        if (view === 'large') return `<div class="poster-card"${halo}><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
-        return `<div class="card" style="padding:8px;"${halo}><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+        const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster" style="${halo}">` : `<div class="poster poster-placeholder" style="${halo}"></div>`;
+        const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px; ${halo}">` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px; ${halo}"></div>`;
+        if (view === 'bullet') return `<div class="bullet-item" style="${halo}" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
+        if (view === 'large') return `<div class="poster-card" style="${halo}"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
+        return `<div class="card" style="padding:8px; ${halo}"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
       }).join('') + '</div>';
     }).catch(() => el.innerHTML = discoverFilters() + '<div class="empty">Failed to load.</div>');
 }
@@ -1697,7 +1695,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.85</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.86</p>
   `;
 }
 
