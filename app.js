@@ -723,29 +723,89 @@ let seasonalPage = 1;
 let recsPage = 1;
 let freePage = 1;
 
-function freeLinks(title) {
-  const q = encodeURIComponent(title);
-  return [
-    ['YouTube', `https://www.youtube.com/results?search_query=${q}+full+movie`],
-    ['Internet Archive', `https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies&fl=identifier&output=json&rows=1`],
-    ['Plex', `https://watch.plex.tv/search?q=${q}`],
-    ['Tubi', `https://tubitv.com/search/${q}`],
-    ['Pluto', `https://pluto.tv/search?q=${q}`]
-  ];
-}
-async function resolveArchiveLink(title) {
+async function findFreeSources(title, runtimeMin) {
+  const sources = [];
   const q = encodeURIComponent(title);
   try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier&output=json&rows=1&sort[]=downloads+desc`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier,runtime&output=json&rows=3&sort[]=downloads+desc`);
     const data = await r.json();
-    const id = data.response?.docs?.[0]?.identifier;
-    if (id) return `https://archive.org/details/${id}`;
+    for (const doc of (data.response?.docs || [])) {
+      const id = doc.identifier;
+      if (!id) continue;
+      let mins = 0;
+      if (doc.runtime) {
+        const parts = String(doc.runtime).match(/\d+/g);
+        if (parts && parts.length >= 2) mins = +parts[0] * 60 + +parts[1];
+        else if (parts) mins = +parts[0];
+      }
+      if (runtimeMin && mins && Math.abs(mins - runtimeMin) > 20) continue;
+      sources.push(['Internet Archive', `https://archive.org/details/${id}`]);
+      break;
+    }
   } catch {}
-  return `https://archive.org/search.php?query=${q}+AND+mediatype:movies`;
+  sources.push(['YouTube', `https://www.youtube.com/results?search_query=${q}+full+movie`]);
+  return sources;
 }
-function freeLinksHtml(title) {
-  const links = freeLinks(title);
-  return `<div class="free-links">${links.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); const w = window.open(''); resolveArchiveLink('${jsArg(title)}').then(u => { if(w) w.location = u; else window.open(u); })">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
+
+async function renderFree(page = 1) {
+  freePage = page;
+  const el = document.getElementById('free');
+  const apiKey = localStorage.getItem('tmdbKey');
+  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
+  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
+  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
+  if (!freeFilters.decades.length) url += '&primary_release_date.lte=2011-12-31';
+  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
+  if (freeFilters.decades.length) {
+    const fetches = freeFilters.decades.map(d => {
+      const dateParam = endpoint === 'tv' ? `&first_air_date.gte=${d}-01-01&first_air_date.lte=${d+9}-12-31` : `&primary_release_date.gte=${d}-01-01&primary_release_date.lte=${d+9}-12-31`;
+      return fetch(url + dateParam).then(r => r.json()).then(data => data.results || []).catch(() => []);
+    });
+    const all = await Promise.all(fetches);
+    const seen = new Set();
+    const results = [];
+    all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
+    await showVerifiedFree(el, results.slice(0, 20), endpoint, typeLabel, apiKey);
+    return;
+  }
+  const data = await fetch(url).then(r => r.json()).catch(() => ({ results: [] }));
+  await showVerifiedFree(el, (data.results || []).slice(0, 20), endpoint, typeLabel, apiKey);
+}
+
+async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey) {
+  if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
+  const verified = [];
+  for (const m of results) {
+    const title = endpoint === 'tv' ? m.name : m.title;
+    let runtime = m.runtime || 0;
+    if (!runtime && apiKey) {
+      try {
+        const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}`).then(r => r.json());
+        runtime = det.runtime || 0;
+      } catch {}
+    }
+    const sources = await findFreeSources(title, runtime);
+    if (sources.length) verified.push({ m, title, sources, runtime });
+    if (verified.length >= 10) break;
+  }
+  if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} found.</div>`; return; }
+  const view = getViewMode('free');
+  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
+    const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+    const posterPath = m.poster_path || '';
+    const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
+    const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
+    const links = `<div class="free-links">${sources.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
+    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
+    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+    const gold = 'color:#d4af37;';
+    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
+    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
+    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+  }).join('') + '</div>';
 }
 
 function renderSeasonal(page = 1) {
@@ -844,53 +904,6 @@ function freeFilterBar() {
     </div>
     <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
   </div>`;
-}
-
-function renderFree(page = 1) {
-  freePage = page;
-  const el = document.getElementById('free');
-  const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
-  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
-  if (!freeFilters.decades.length) url += '&primary_release_date.lte=2011-12-31';
-  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
-  if (freeFilters.decades.length) {
-    const fetches = freeFilters.decades.map(d => {
-      const dateParam = endpoint === 'tv' ? `&first_air_date.gte=${d}-01-01&first_air_date.lte=${d+9}-12-31` : `&primary_release_date.gte=${d}-01-01&primary_release_date.lte=${d+9}-12-31`;
-      return fetch(url + dateParam).then(r => r.json()).then(data => data.results || []).catch(() => []);
-    });
-    Promise.all(fetches).then(all => {
-      const seen = new Set();
-      const results = [];
-      all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
-      showFreeResults(el, results.slice(0, 10), endpoint, typeLabel);
-    });
-    return;
-  }
-  fetch(url).then(r => r.json()).then(data => showFreeResults(el, (data.results || []).slice(0, 10), endpoint, typeLabel)).catch(() => el.innerHTML = freeFilterBar() + '<div class="empty">Failed to load free titles.</div>');
-}
-
-function showFreeResults(el, results, endpoint, typeLabel) {
-  if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
-  const view = getViewMode('free');
-  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + results.map(m => {
-    const title = endpoint === 'tv' ? m.name : m.title;
-    const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-    const posterPath = m.poster_path || '';
-    const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-    const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
-    const links = freeLinksHtml(title);
-    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
-    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-    const gold = 'color:#d4af37;';
-    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
-    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
-    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
-  }).join('') + '</div>';
 }
 
 function onSearchInput() {
@@ -1794,7 +1807,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.99</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.100</p>
   `;
 }
 
