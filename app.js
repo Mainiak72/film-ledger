@@ -762,58 +762,65 @@ async function renderFree(page = 1) {
   const el = document.getElementById('free');
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = freeFilterBar() + '<div class="empty">Checking Internet Archive against TMDB...</div>';
-  const yearFilter = freeFilters.decades.length
-    ? ` AND year:[${Math.min(...freeFilters.decades)} TO ${Math.max(...freeFilters.decades) + 9}]`
-    : '';
-  const rows = 30;
-  try {
-    const q = encodeURIComponent(`mediatype:movies${yearFilter} AND -title:trailer AND -title:teaser AND -title:clip`);
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
-    const data = await r.json();
-    const docs = data.response?.docs || [];
-    if (!docs.length) {
-      el.innerHTML = freeFilterBar() + `<div class="empty">No free movies found.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}</div>`;
-      return;
-    }
-    const verified = [];
-    await Promise.all(docs.slice(0, 20).map(async (doc) => {
-      const title = Array.isArray(doc.title) ? doc.title[0] : (doc.title || '');
-      if (!title) return;
-      try {
-        const tmdb = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(title)}&language=en-US&page=1`).then(r => r.json());
-        const hit = (tmdb.results || []).find(m => {
-          const t = (m.title || '').toLowerCase();
-          const q = title.toLowerCase().slice(0, Math.min(12, title.length));
-          return t.includes(q) || q.includes(t.slice(0, Math.min(12, t.length)));
-        });
-        if (hit) verified.push({ doc, tmdb: hit, title });
-      } catch {}
-    }));
-    if (!verified.length) {
-      el.innerHTML = freeFilterBar() + `<div class="empty">No verified free movies on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-      return;
-    }
-    const view = getViewMode('free');
-    const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-    el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ doc, tmdb, title }) => {
-      const year = tmdb.release_date ? tmdb.release_date.slice(0, 4) : (doc.year || '');
-      const id = doc.identifier;
-      const link = `https://archive.org/embed/${id}`;
-      const poster = tmdb.poster_path ? `https://image.tmdb.org/t/p/w342${tmdb.poster_path}` : `https://archive.org/services/img/${id}`;
-      const existing = movies.find(x => x.tmdbId === tmdb.id);
-      const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-      const addBtn = existing ? '' : `<button onclick="addFromSearch(${tmdb.id}, '${jsArg(title)}', '${year}', '', '', 'movie', '${tmdb.poster_path || ''}', 'streaming', true)">Add</button>`;
-      const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
-      const overview = (tmdb.overview || '').slice(0, 140);
-      const desc = overview ? `<div class="poster-desc">${escapeHtml(overview)}${overview.length >= 140 ? '…' : ''}</div>` : '';
-      if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
-      if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div>${desc}</div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
-      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div>${overview ? `<div style="font-size:0.75rem; color:#aaa; margin-top:2px;">${escapeHtml(overview)}</div>` : ''}</div><div>${watchBtn}${addBtn}</div></div></div>`;
-    }).join('') + '</div>' + pager;
-  } catch (e) {
-    el.innerHTML = freeFilterBar() + `<div class="empty">Could not load. Try again.</div>`;
+  el.innerHTML = freeFilterBar() + '<div class="empty">Finding theatrical movies with free copies...</div>';
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false&with_release_type=2|3`;
+  if (!freeFilters.decades.length) url += '&primary_release_date.gte=1920-01-01&primary_release_date.lte=1980-12-31';
+  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
+  if (freeFilters.decades.length) {
+    const fetches = freeFilters.decades.map(d => {
+      const dateParam = `&primary_release_date.gte=${d}-01-01&primary_release_date.lte=${d+9}-12-31`;
+      return fetch(url + dateParam).then(r => r.json()).then(data => data.results || []).catch(() => []);
+    });
+    const all = await Promise.all(fetches);
+    const seen = new Set();
+    const results = [];
+    all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
+    await showVerifiedFree(el, results.slice(0, 20), endpoint, apiKey, page);
+    return;
   }
+  const data = await fetch(url).then(r => r.json()).catch(() => ({ results: [] }));
+  await showVerifiedFree(el, (data.results || []).slice(0, 20), endpoint, apiKey, page);
+}
+
+async function showVerifiedFree(el, results, endpoint, apiKey, page) {
+  if (!results.length) { el.innerHTML = freeFilterBar() + '<div class="empty">No theatrical movies found.</div>'; return; }
+  el.innerHTML = freeFilterBar() + `<div class="empty">Checking ${results.length} titles for free copies...</div>`;
+  const verified = [];
+  await Promise.all(results.map(async (m) => {
+    const title = endpoint === 'tv' ? m.name : m.title;
+    try {
+      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title&output=json&rows=3`).then(r => r.json());
+      const doc = (ia.response?.docs || []).find(d => {
+        const dt = (Array.isArray(d.title) ? d.title[0] : d.title || '').toLowerCase();
+        return dt.includes(title.toLowerCase().slice(0, Math.min(10, title.length)));
+      });
+      if (doc) verified.push({ m, title, iaId: doc.identifier });
+    } catch {}
+  }));
+  if (!verified.length) {
+    el.innerHTML = freeFilterBar() + `<div class="empty">No free theatrical movies on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
+    return;
+  }
+  const view = getViewMode('free');
+  const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
+  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, iaId }) => {
+    const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+    const link = `https://archive.org/embed/${iaId}`;
+    const poster = m.poster_path ? `https://image.tmdb.org/t/p/w342${m.poster_path}` : `https://archive.org/services/img/${iaId}`;
+    const existing = movies.find(x => x.tmdbId === m.id);
+    const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${m.poster_path || ''}', 'streaming', true)">Add</button>`;
+    const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
+    const gold = 'color:#d4af37; font-weight:600;';
+    const overview = (m.overview || '').slice(0, 140);
+    const desc = overview ? `<div class="poster-desc">${escapeHtml(overview)}${overview.length >= 140 ? '…' : ''}</div>` : '';
+    const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
+    const smallPoster = `<img src="${poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;" onerror="this.style.display='none'">`;
+    if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
+    if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div>${desc}</div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
+    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div>${overview ? `<div style="font-size:0.75rem; color:#aaa; margin-top:2px;">${escapeHtml(overview)}</div>` : ''}</div><div>${watchBtn}${addBtn}</div></div></div>`;
+  }).join('') + '</div>' + pager;
 }
 
 function addFreeFromIA(title, year, iaId) {
@@ -834,44 +841,6 @@ function addFreeFromIA(title, year, iaId) {
   render();
 }
 
-async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) {
-  if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
-  el.innerHTML = freeFilterBar() + `<div class="empty">Checking ${results.length} titles...</div>`;
-  const verified = [];
-  const batch = results.slice(0, 30);
-  await Promise.all(batch.map(async (m) => {
-    const title = endpoint === 'tv' ? m.name : m.title;
-    let runtime = m.runtime || 0;
-    if (!runtime && apiKey) {
-      try {
-        const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}`).then(r => r.json());
-        runtime = det.runtime || 0;
-      } catch {}
-    }
-    const sources = await findFreeSources(title, runtime);
-    if (sources.length) verified.push({ m, title, sources, runtime });
-  }));
-  if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`; return; }
-  const view = getViewMode('free');
-  const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
-    const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-    const posterPath = m.poster_path || '';
-    const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-    if (existing && !existing.free) { existing.free = true; save(); }
-    const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming', true)">Add</button>`;
-    const links = `<div class="free-links">${sources.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
-    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
-    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-    const gold = 'color:#d4af37; font-weight:600;';
-    const iaLink = sources.find(s => s[0] === 'Internet Archive');
-    const watchBtn = iaLink ? `<a href="${iaLink[1]}" target="_blank" rel="noopener" class="ia-watch">Watch</a>` : '';
-    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${watchBtn}${addBtn}</span></div>`;
-    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
-    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${watchBtn}${addBtn}</div></div></div>`;
-  }).join('') + '</div>' + pager;
-}
 
 function renderSeasonal(page = 1) {
   seasonalPage = page;
@@ -1877,7 +1846,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.117</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.118</p>
   `;
 }
 
