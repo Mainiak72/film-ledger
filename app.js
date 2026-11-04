@@ -479,7 +479,7 @@ function showDetails(id) {
           <div>${escapeHtml(cast)}</div>
         </div>
         <div style="font-size:0.7rem; color:#888; margin-bottom:10px;">
-          Also free: ${otherFree.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
+          Also free: ${otherFree.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); const w = window.open(''); resolveArchiveLink('${jsArg(m.title)}').then(u => { if(w) w.location = u; else window.open(u); })" style="color:#d4af37; margin-right:8px;">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
         </div>
         <div style="border-top:1px solid #2e2820; padding-top:10px;">
           <div class="item-actions" style="margin-bottom:8px;">
@@ -736,7 +736,7 @@ function freeLinks(title) {
 async function resolveArchiveLink(title) {
   const q = encodeURIComponent(title);
   try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies&fl=identifier&output=json&rows=1`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier&output=json&rows=1&sort[]=downloads+desc`);
     const data = await r.json();
     const id = data.response?.docs?.[0]?.identifier;
     if (id) return `https://archive.org/details/${id}`;
@@ -745,7 +745,7 @@ async function resolveArchiveLink(title) {
 }
 function freeLinksHtml(title) {
   const links = freeLinks(title);
-  return `<div class="free-links">${links.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); resolveArchiveLink('${jsArg(title)}').then(u => window.open(u))">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
+  return `<div class="free-links">${links.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); const w = window.open(''); resolveArchiveLink('${jsArg(title)}').then(u => { if(w) w.location = u; else window.open(u); })">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
 }
 
 function renderSeasonal(page = 1) {
@@ -1793,7 +1793,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.96</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.97</p>
   `;
 }
 
