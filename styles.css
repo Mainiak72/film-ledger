@@ -561,14 +561,18 @@ nav button.active {
   gap: 6px;
   margin-top: 6px;
 }
-.free-links a {
-  font-size: 0.68rem;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  padding: 2px 8px;
-  border-radius: 6px;
+.ia-watch {
+  display: inline-block;
+  background: #d4af37;
+  color: #1a1408;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
   text-decoration: none;
+  margin-right: 4px;
 }
+.ia-watch:hover { background: #e8c547; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;

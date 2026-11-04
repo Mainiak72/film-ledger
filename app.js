@@ -814,10 +814,12 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) 
     const links = `<div class="free-links">${sources.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
     const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
     const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-    const gold = 'color:#d4af37;';
-    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
-    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
-    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+    const gold = 'color:#d4af37; font-weight:600;';
+    const iaLink = sources.find(s => s[0] === 'Internet Archive');
+    const watchBtn = iaLink ? `<a href="${iaLink[1]}" target="_blank" rel="noopener" class="ia-watch">Watch</a>` : '';
+    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${watchBtn}${addBtn}</span></div>`;
+    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
+    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${watchBtn}${addBtn}</div></div></div>`;
   }).join('') + '</div>' + pager;
 }
 
@@ -1801,8 +1803,6 @@ function renderSettings() {
       <p class="backup-note">Search, details, seasonal, and recommendations need a free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org/settings/api</a>.</p>
       <input id="settingsKey" type="text" value="${escapeHtml(key)}" placeholder="Paste your TMDB key" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-bottom:10px;">
       <button type="button" onclick="saveApiKey()" style="background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save Key</button>
-      <input id="youtubeKey" type="text" value="${escapeHtml(localStorage.getItem('youtubeKey') || '')}" placeholder="YouTube API key (optional)" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-top:10px; margin-bottom:10px;">
-      <button type="button" onclick="saveYoutubeKey()">Save YouTube Key</button>
     </div>
     <div class="backup-box">
       <div class="stat-label" style="margin-bottom:6px;">Library Backup</div>
@@ -1824,22 +1824,8 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.108</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.109</p>
   `;
-}
-
-function saveYoutubeKey() {
-  const input = document.getElementById('youtubeKey');
-  if (!input) return;
-  const key = input.value.trim();
-  if (!key) {
-    localStorage.removeItem('youtubeKey');
-    showToast('YouTube key cleared');
-  } else {
-    localStorage.setItem('youtubeKey', key);
-    showToast('YouTube key saved');
-  }
-  renderSettings();
 }
 
 function saveApiKey() {
