@@ -808,9 +808,11 @@ async function renderFree(page = 1) {
       const gold = 'color:#d4af37; font-weight:600;';
       const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
       const smallPoster = `<img src="${poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;" onerror="this.style.display='none'">`;
+      const overview = (tmdb.overview || '').slice(0, 140);
+      const desc = overview ? `<div class="poster-desc">${escapeHtml(overview)}${overview.length >= 140 ? '…' : ''}</div>` : '';
       if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
-      if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
-      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div>${watchBtn}${addBtn}</div></div></div>`;
+      if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div>${desc}</div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
+      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div>${overview ? `<div style="font-size:0.75rem; color:#aaa; margin-top:2px;">${escapeHtml(overview)}</div>` : ''}</div><div>${watchBtn}${addBtn}</div></div></div>`;
     }).join('') + '</div>' + pager;
   } catch (e) {
     el.innerHTML = freeFilterBar() + `<div class="empty">Could not load. Try again.</div>`;
@@ -972,6 +974,8 @@ function freeFilterBar() {
   </div>`;
 }
 
+let suggestTimer = null;
+
 function onSearchInput() {
   clearTimeout(suggestTimer);
   const q = document.getElementById('searchQuery').value.trim();
@@ -985,7 +989,7 @@ function onSearchInput() {
 function fetchSuggestions(q) {
   const apiKey = localStorage.getItem('tmdbKey') || '';
   const box = document.getElementById('suggestions');
-  if (!apiKey) { box.innerHTML = ''; return; }
+  if (!apiKey) { box.innerHTML = '<div class="empty">Add your TMDB API key in Settings to search.</div>'; return; }
   const variants = [q, ...titleVariants(q)];
   const fetches = variants.slice(0, 3).flatMap(v => [
     fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(v)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] })),
@@ -1017,9 +1021,9 @@ function fetchSuggestions(q) {
       const img = m.poster_path
         ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" alt="">`
         : '<div class="suggest-ph"></div>';
-      return `<div class="suggest-item" onclick="pickSuggestion(${i})">${img}<div><div class="title">${escapeHtml(title || '')}</div><div class="suggest-kind">${isTV ? 'TV' : 'Movie'}${year ? ' · ' + year : ''}</div></div></div>`;
+      return `<div class="suggest-item" onclick="pickSuggestion(${i})">${img}<div><div class="title">${escapeHtml(title)}</div><div class="suggest-kind">${year}${isTV ? ' · TV' : ''}</div></div></div>`;
     }).join('');
-  });
+  }).catch(() => { box.innerHTML = ''; });
 }
 
 function uniquePersons(list) {
@@ -1875,7 +1879,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.115</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.116</p>
   `;
 }
 
