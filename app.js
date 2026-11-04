@@ -733,14 +733,14 @@ async function findFreeSources(title, runtimeMin) {
   const sources = [];
   const q = encodeURIComponent(title);
   try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,runtime,title&output=json&rows=10&sort[]=downloads+desc`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser+AND+-title:clip&fl=identifier,runtime,title&output=json&rows=10&sort[]=downloads+desc`);
     const data = await r.json();
     for (const doc of (data.response?.docs || [])) {
       const id = doc.identifier;
       if (!id) continue;
       const docTitle = (Array.isArray(doc.title) ? doc.title[0] : doc.title || '').toLowerCase();
       if (!docTitle.includes(title.toLowerCase().slice(0, Math.min(8, title.length)))) continue;
-      if (docTitle.includes('trailer') || docTitle.includes('teaser')) continue;
+      if (docTitle.includes('trailer') || docTitle.includes('teaser') || docTitle.includes('clip')) continue;
       let mins = 0;
       if (doc.runtime) {
         const parts = String(doc.runtime).match(/\d+/g);
@@ -754,27 +754,6 @@ async function findFreeSources(title, runtimeMin) {
       break;
     }
   } catch {}
-  const ytKey = localStorage.getItem('youtubeKey');
-  if (ytKey && runtimeMin) {
-    try {
-      const search = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}+full+movie&type=video&videoDuration=long&maxResults=5&key=${ytKey}`).then(r => r.json());
-      const ids = (search.items || []).map(i => i.id.videoId).filter(Boolean);
-      if (ids.length) {
-        const details = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${ids.join(',')}&key=${ytKey}`).then(r => r.json());
-        for (const v of (details.items || [])) {
-          const dur = v.contentDetails?.duration || '';
-          const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-          if (!match) continue;
-          const mins = (+match[1] || 0) * 60 + (+match[2] || 0);
-          if (Math.abs(mins - runtimeMin) > 20) continue;
-          const vTitle = (v.snippet?.title || '').toLowerCase();
-          if (!vTitle.includes(title.toLowerCase().slice(0, Math.min(8, title.length)))) continue;
-          sources.push(['YouTube', `https://www.youtube.com/watch?v=${v.id}`]);
-          break;
-        }
-      }
-    } catch {}
-  }
   return sources;
 }
 
@@ -787,7 +766,7 @@ async function renderFree(page = 1) {
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
   let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
-  if (!freeFilters.decades.length) url += '&primary_release_date.lte=2011-12-31';
+  if (!freeFilters.decades.length) url += '&primary_release_date.gte=1940-01-01&primary_release_date.lte=1979-12-31';
   if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
   if (freeFilters.decades.length) {
     const fetches = freeFilters.decades.map(d => {
@@ -809,7 +788,7 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) 
   if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
   el.innerHTML = freeFilterBar() + `<div class="empty">Checking ${results.length} titles...</div>`;
   const verified = [];
-  const batch = results.slice(0, 20);
+  const batch = results.slice(0, 30);
   await Promise.all(batch.map(async (m) => {
     const title = endpoint === 'tv' ? m.name : m.title;
     let runtime = m.runtime || 0;
@@ -1845,7 +1824,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.106</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.107</p>
   `;
 }
 
