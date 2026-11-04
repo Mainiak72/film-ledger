@@ -147,7 +147,8 @@ function addToTop(id, which) {
 }
 
 function renderItem(m, view, rank) {
-  const title = escapeHtml(m.title || '');
+  const gold = m.free ? 'color:#d4af37;' : '';
+  const titleHtml = `<span style="${gold}">${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
   const origin = m.origin
@@ -162,7 +163,7 @@ function renderItem(m, view, rank) {
 
   if (view === 'bullet') {
     return `<div class="bullet-item" onclick="showDetails('${m.id}')">
-      <span class="bullet-title">${rank ? rank + '. ' : ''}${title}</span>
+      <span class="bullet-title">${titleHtml}</span>
       <span class="bullet-actions" onclick="event.stopPropagation()">${rating}${libraryButtons(m, rank)}</span>
     </div>`;
   }
@@ -175,7 +176,7 @@ function renderItem(m, view, rank) {
       <div onclick="showDetails('${m.id}')" style="cursor:pointer; position:relative;">
         ${rank ? `<div class="poster-rank ${isFirst ? 'gold' : ''}">${rank}</div>` : ''}
         ${posterImg}
-        <div class="poster-title">${title}</div>
+        <div class="poster-title">${titleHtml}</div>
         <div class="poster-meta">${year} ${rating}</div>
         ${shortDesc ? `<div class="poster-desc">${escapeHtml(shortDesc)}${shortDesc.length >= 80 ? '…' : ''}</div>` : ''}
       </div>
@@ -192,7 +193,7 @@ function renderItem(m, view, rank) {
       <div class="movie-item">
         ${smallPoster}
         <div class="movie-info">
-          <div class="title">${rank ? rank + '. ' : ''}${title}${origin}</div>
+          <div class="title">${titleHtml}${origin}</div>
           <div class="meta">${year} ${m.genre ? '· ' + m.genre : ''}</div>
         </div>
         ${rating}
@@ -727,23 +728,26 @@ async function findFreeSources(title, runtimeMin) {
   const sources = [];
   const q = encodeURIComponent(title);
   try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier,runtime&output=json&rows=3&sort[]=downloads+desc`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier,runtime,title&output=json&rows=5&sort[]=downloads+desc`);
     const data = await r.json();
     for (const doc of (data.response?.docs || [])) {
       const id = doc.identifier;
       if (!id) continue;
+      const docTitle = (Array.isArray(doc.title) ? doc.title[0] : doc.title || '').toLowerCase();
+      if (!docTitle.includes(title.toLowerCase().slice(0, 10))) continue;
       let mins = 0;
       if (doc.runtime) {
         const parts = String(doc.runtime).match(/\d+/g);
-        if (parts && parts.length >= 2) mins = +parts[0] * 60 + +parts[1];
+        if (parts && parts.length >= 3) mins = +parts[0] * 60 + +parts[1];
+        else if (parts && parts.length === 2) mins = +parts[0];
         else if (parts) mins = +parts[0];
       }
       if (runtimeMin && mins && Math.abs(mins - runtimeMin) > 20) continue;
+      if (!mins && runtimeMin) continue;
       sources.push(['Internet Archive', `https://archive.org/details/${id}`]);
       break;
     }
   } catch {}
-  sources.push(['YouTube', `https://www.youtube.com/results?search_query=${q}+full+movie`]);
   return sources;
 }
 
@@ -752,7 +756,7 @@ async function renderFree(page = 1) {
   const el = document.getElementById('free');
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
+  el.innerHTML = freeFilterBar() + '<div class="empty">Checking free titles...</div>';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
   let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
@@ -767,14 +771,14 @@ async function renderFree(page = 1) {
     const seen = new Set();
     const results = [];
     all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
-    await showVerifiedFree(el, results.slice(0, 20), endpoint, typeLabel, apiKey);
+    await showVerifiedFree(el, results.slice(0, 40), endpoint, typeLabel, apiKey, page);
     return;
   }
   const data = await fetch(url).then(r => r.json()).catch(() => ({ results: [] }));
-  await showVerifiedFree(el, (data.results || []).slice(0, 20), endpoint, typeLabel, apiKey);
+  await showVerifiedFree(el, (data.results || []).slice(0, 40), endpoint, typeLabel, apiKey, page);
 }
 
-async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey) {
+async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) {
   if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
   const verified = [];
   for (const m of results) {
@@ -788,16 +792,17 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey) {
     }
     const sources = await findFreeSources(title, runtime);
     if (sources.length) verified.push({ m, title, sources, runtime });
-    if (verified.length >= 10) break;
+    if (verified.length >= 20) break;
   }
-  if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} found.</div>`; return; }
+  if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`; return; }
   const view = getViewMode('free');
-  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
+  const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
+  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
     const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
     const posterPath = m.poster_path || '';
     const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
     const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
+    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming', true)">Add</button>`;
     const links = `<div class="free-links">${sources.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
     const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
     const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
@@ -805,7 +810,7 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey) {
     if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
     if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
     return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
-  }).join('') + '</div>';
+  }).join('') + '</div>' + pager;
 }
 
 function renderSeasonal(page = 1) {
@@ -1502,7 +1507,7 @@ function addFromSearchIndex(idx) {
   addFromSearch(m.id, title, year, (m.genre_ids || []).join(','), m.overview || '', m.media_type, m.poster_path || '', origin);
 }
 
-function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, posterPath, origin) {
+function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, posterPath, origin, isFree) {
   if (movies.some(m => m.tmdbId === tmdbId && m.mediaType === mediaType)) {
     alert('Already in your library.');
     return;
@@ -1538,6 +1543,7 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
     poster: posterPath || '',
     origin: origin || '',
     status: 'watchlist',
+    free: !!isFree,
     rating: null,
     added: new Date().toISOString()
   });
@@ -1807,7 +1813,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.100</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.101</p>
   `;
 }
 
