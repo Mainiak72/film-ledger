@@ -148,7 +148,7 @@ function addToTop(id, which) {
 
 function renderItem(m, view, rank) {
   const title = escapeHtml(m.title || '');
-  const gold = m.free ? 'color:#d4af37;' : '';
+  const gold = m.free ? 'color:#d4af37; font-weight:600;' : '';
   const titleHtml = `<span style="${gold}">${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
@@ -687,7 +687,7 @@ function renderDecades() {
           </div>
           ${m.poster ? `<img src="https://image.tmdb.org/t/p/w92${m.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
           <div style="flex:1; cursor:pointer;" onclick="showDetails('${m.id}')">
-            <div class="title">${escapeHtml(m.title)}</div>
+            <div class="title" style="${m.free ? 'color:#d4af37; font-weight:600;' : ''}">${escapeHtml(m.title)}</div>
             <div class="meta">${m.year || ''}</div>
           </div>
           <span class="rating">${m.rating}%</span>
@@ -804,8 +804,10 @@ async function renderFree(page = 1) {
 
 async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) {
   if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
+  el.innerHTML = freeFilterBar() + `<div class="empty">Checking ${results.length} titles...</div>`;
   const verified = [];
-  for (const m of results) {
+  const batch = results.slice(0, 20);
+  await Promise.all(batch.map(async (m) => {
     const title = endpoint === 'tv' ? m.name : m.title;
     let runtime = m.runtime || 0;
     if (!runtime && apiKey) {
@@ -816,8 +818,7 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) 
     }
     const sources = await findFreeSources(title, runtime);
     if (sources.length) verified.push({ m, title, sources, runtime });
-    if (verified.length >= 20) break;
-  }
+  }));
   if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`; return; }
   const view = getViewMode('free');
   const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
@@ -825,6 +826,7 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) 
     const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
     const posterPath = m.poster_path || '';
     const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
+    if (existing && !existing.free) { existing.free = true; save(); }
     const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
     const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming', true)">Add</button>`;
     const links = `<div class="free-links">${sources.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
@@ -1840,7 +1842,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.104</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.105</p>
   `;
 }
 
@@ -1880,6 +1882,21 @@ function showTab(tab) {
   if (tab === 'free') renderFree(freePage);
   else if (tab === 'recs') renderRecommendations(recsPage);
   else if (tab === 'seasonal') renderSeasonal(seasonalPage);
+}
+
+async function backfillFree() {
+  const apiKey = localStorage.getItem('tmdbKey');
+  if (!apiKey) return;
+  const unchecked = movies.filter(m => m.tmdbId && m.free == null).slice(0, 10);
+  for (const m of unchecked) {
+    try {
+      const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
+      const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}`).then(r => r.json());
+      const sources = await findFreeSources(m.title, det.runtime || 0);
+      m.free = sources.length > 0;
+    } catch { m.free = false; }
+  }
+  if (unchecked.length) { save(); render(); }
 }
 
 async function backfillPosters() {
@@ -1928,6 +1945,7 @@ function startLedger() {
     window.__filmLedgerBooted = true;
     setTimeout(backfillPosters, 500);
     setTimeout(() => renderRecommendations(1), 800);
+    setTimeout(backfillFree, 1200);
   }
   render();
   applyTabVisibility();
