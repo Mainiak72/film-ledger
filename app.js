@@ -147,6 +147,7 @@ function addToTop(id, which) {
 }
 
 function renderItem(m, view, rank) {
+  const title = escapeHtml(m.title || '');
   const gold = m.free ? 'color:#d4af37;' : '';
   const titleHtml = `<span style="${gold}">${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
@@ -212,6 +213,8 @@ function render() {
   renderDecades();
   renderLeastFavorite();
   renderSeasonal(seasonalPage);
+  renderFree(freePage);
+  renderRecommendations(recsPage);
   renderStats();
   renderSettings();
 }
@@ -1771,6 +1774,7 @@ const ALL_TABS = [
   ['alltime', 'Watched'],
   ['top10', 'Top 10'],
   ['decades', 'Decades'],
+  ['least', 'Least'],
   ['stats', 'Stats'],
   ['recs', 'Recommended'],
   ['seasonal', 'Seasonal'],
@@ -1836,7 +1840,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.103</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.104</p>
   `;
 }
 
