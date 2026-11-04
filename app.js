@@ -761,12 +761,12 @@ async function renderFree(page = 1) {
   freePage = page;
   const el = document.getElementById('free');
   el.innerHTML = freeFilterBar() + '<div class="empty">Loading free movies from Internet Archive...</div>';
-  const yearStart = freeFilters.decades.length ? Math.min(...freeFilters.decades) : 1940;
-  const yearEnd = freeFilters.decades.length ? Math.max(...freeFilters.decades) + 9 : 1979;
+  const yearFilter = freeFilters.decades.length
+    ? ` AND year:[${Math.min(...freeFilters.decades)} TO ${Math.max(...freeFilters.decades) + 9}]`
+    : '';
   const rows = 20;
-  const start = (page - 1) * rows;
   try {
-    const q = encodeURIComponent(`mediatype:movies AND year:[${yearStart} TO ${yearEnd}] AND runtime:* AND -title:trailer AND -title:teaser AND -title:clip`);
+    const q = encodeURIComponent(`mediatype:movies${yearFilter} AND runtime:[40 TO 300] AND -title:trailer AND -title:teaser AND -title:clip AND -title:preview`);
     const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year,runtime&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
     const data = await r.json();
     const docs = data.response?.docs || [];
@@ -781,13 +781,17 @@ async function renderFree(page = 1) {
       const year = doc.year || '';
       const id = doc.identifier;
       const link = `https://archive.org/embed/${id}`;
+      const poster = `https://archive.org/services/img/${id}`;
       const existing = movies.find(x => x.title && x.title.toLowerCase() === title.toLowerCase());
       const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
       const addBtn = existing ? '' : `<button onclick="addFreeFromIA('${jsArg(title)}', '${year}', '${id}')">Add</button>`;
       const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
       const gold = 'color:#d4af37; font-weight:600;';
+      const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
+      const smallPoster = `<img src="${poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;" onerror="this.style.display='none'">`;
       if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
-      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;"><div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div>${watchBtn}${addBtn}</div></div></div>`;
+      if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
+      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div>${watchBtn}${addBtn}</div></div></div>`;
     }).join('') + '</div>' + pager;
   } catch (e) {
     el.innerHTML = freeFilterBar() + `<div class="empty">Could not load Internet Archive. Try again.</div>`;
@@ -1852,7 +1856,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.110</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.111</p>
   `;
 }
 
