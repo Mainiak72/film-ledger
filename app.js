@@ -40,6 +40,8 @@ function setViewMode(tabId, mode) {
 function tabHead(titleHtml, tabId, refreshKind) {
   const refresh = refreshKind === 'seasonal'
     ? `<button type="button" class="refresh-btn" onclick="renderSeasonal(seasonalPage + 1)">Refresh</button>`
+    : refreshKind === 'recs'
+    ? `<button type="button" class="refresh-btn" onclick="renderRecommendations(recsPage + 1)">Refresh</button>`
     : '';
   return `<div class="tab-head"><div class="tab-title">${titleHtml}</div><div class="tab-tools">${viewToggle(tabId)}${refresh}</div></div>`;
 }
@@ -224,7 +226,7 @@ function renderList(tabId, filter) {
   if (searchable) {
     html += `<div style="margin-bottom:12px; display:flex; gap:6px;">
       <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
-      ${tabId === 'watchlist' ? `<select id="watchlistGenre" onchange="filterTab('watchlist')" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;"><option value="">All genres</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select>` : ''}
+      ${tabId === 'watchlist' ? `<select id="watchlistGenre" multiple onchange="filterTab('watchlist')" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:8px; height:32px;"><option value="">All genres</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select>` : ''}
     </div><div id="${tabId}List" class="list-container ${view}">`;
   } else {
     html += `<div class="list-container ${view}">`;
@@ -243,7 +245,7 @@ function filterTab(tabId) {
   refreshTopSets();
   const query = document.getElementById(tabId + 'Search').value.toLowerCase().trim();
   const genreSel = document.getElementById('watchlistGenre');
-  const genre = tabId === 'watchlist' && genreSel ? genreSel.value : '';
+  const genres = tabId === 'watchlist' && genreSel ? [...genreSel.selectedOptions].map(o => o.value).filter(Boolean) : [];
   const listEl = document.getElementById(tabId + 'List');
   const view = getViewMode(tabId);
   let list = filtered();
@@ -251,7 +253,7 @@ function filterTab(tabId) {
   else if (tabId === 'watching') list = list.filter(m => m.status === 'watching');
   else if (tabId === 'alltime') list = list.filter(m => m.status === 'watched');
   list = list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  if (genre) list = list.filter(m => (m.genre || '') === genre);
+  if (genres.length) list = list.filter(m => genres.some(g => (m.genre || '').includes(g)));
 
   const filteredList = query 
     ? list.filter(m => m.title.toLowerCase().includes(query) || (m.genre && m.genre.toLowerCase().includes(query)))
@@ -820,7 +822,7 @@ function renderFree(page = 1) {
   el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false&with_watch_monetization_types=free&watch_region=US`;
+  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
   if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
   if (freeFilters.decades.length) {
     const fetches = freeFilters.decades.map(d => {
@@ -1759,7 +1761,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.89</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.90</p>
   `;
 }
 
