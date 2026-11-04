@@ -554,25 +554,6 @@ nav button.active {
 .free-filters { margin-bottom: 10px; }
 .free-filters button { padding: 6px 12px; font-size: 0.78rem; border-radius: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .filter-chip { display: inline-block; padding: 3px 8px; font-size: 0.72rem; background: var(--accent); color: #1a1408; border-radius: 6px; cursor: pointer; }
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-  align-items: center;
-}
-.discover-filters button, .discover-filters select {
-  padding: 6px 12px;
-  font-size: 0.78rem;
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-.discover-filters button.on {
-  background: var(--accent);
-  color: #1a1408;
-  border-color: var(--accent);
-}
 .free-links {
   display: flex;
   flex-wrap: wrap;
