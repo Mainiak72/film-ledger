@@ -760,11 +760,13 @@ async function findFreeSources(title, runtimeMin) {
 async function renderFree(page = 1) {
   freePage = page;
   const el = document.getElementById('free');
-  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free movies from Internet Archive...</div>';
+  const apiKey = localStorage.getItem('tmdbKey');
+  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
+  el.innerHTML = freeFilterBar() + '<div class="empty">Checking Internet Archive against TMDB...</div>';
   const yearFilter = freeFilters.decades.length
     ? ` AND year:[${Math.min(...freeFilters.decades)} TO ${Math.max(...freeFilters.decades) + 9}]`
     : '';
-  const rows = 20;
+  const rows = 30;
   try {
     const q = encodeURIComponent(`mediatype:movies${yearFilter} AND -title:trailer AND -title:teaser AND -title:clip`);
     const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
@@ -774,17 +776,34 @@ async function renderFree(page = 1) {
       el.innerHTML = freeFilterBar() + `<div class="empty">No free movies found.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}</div>`;
       return;
     }
+    const verified = [];
+    await Promise.all(docs.slice(0, 20).map(async (doc) => {
+      const title = Array.isArray(doc.title) ? doc.title[0] : (doc.title || '');
+      if (!title) return;
+      try {
+        const tmdb = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(title)}&language=en-US&page=1`).then(r => r.json());
+        const hit = (tmdb.results || []).find(m => {
+          const t = (m.title || '').toLowerCase();
+          const q = title.toLowerCase().slice(0, Math.min(12, title.length));
+          return t.includes(q) || q.includes(t.slice(0, Math.min(12, t.length)));
+        });
+        if (hit) verified.push({ doc, tmdb: hit, title });
+      } catch {}
+    }));
+    if (!verified.length) {
+      el.innerHTML = freeFilterBar() + `<div class="empty">No verified free movies on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
+      return;
+    }
     const view = getViewMode('free');
     const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-    el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + docs.map(doc => {
-      const title = Array.isArray(doc.title) ? doc.title[0] : (doc.title || 'Unknown');
-      const year = doc.year || '';
+    el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ doc, tmdb, title }) => {
+      const year = tmdb.release_date ? tmdb.release_date.slice(0, 4) : (doc.year || '');
       const id = doc.identifier;
       const link = `https://archive.org/embed/${id}`;
-      const poster = `https://archive.org/services/img/${id}`;
-      const existing = movies.find(x => x.title && x.title.toLowerCase() === title.toLowerCase());
+      const poster = tmdb.poster_path ? `https://image.tmdb.org/t/p/w342${tmdb.poster_path}` : `https://archive.org/services/img/${id}`;
+      const existing = movies.find(x => x.tmdbId === tmdb.id);
       const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-      const addBtn = existing ? '' : `<button onclick="addFreeFromIA('${jsArg(title)}', '${year}', '${id}')">Add</button>`;
+      const addBtn = existing ? '' : `<button onclick="addFromSearch(${tmdb.id}, '${jsArg(title)}', '${year}', '', '', 'movie', '${tmdb.poster_path || ''}', 'streaming', true)">Add</button>`;
       const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
       const gold = 'color:#d4af37; font-weight:600;';
       const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
@@ -794,7 +813,7 @@ async function renderFree(page = 1) {
       return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div>${watchBtn}${addBtn}</div></div></div>`;
     }).join('') + '</div>' + pager;
   } catch (e) {
-    el.innerHTML = freeFilterBar() + `<div class="empty">Could not load Internet Archive. Try again.</div>`;
+    el.innerHTML = freeFilterBar() + `<div class="empty">Could not load. Try again.</div>`;
   }
 }
 
@@ -1856,7 +1875,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.114</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.115</p>
   `;
 }
 
