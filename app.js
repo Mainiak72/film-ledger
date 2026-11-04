@@ -150,7 +150,7 @@ function addToTop(id, which) {
 
 function renderItem(m, view, rank) {
   const title = escapeHtml(m.title || '');
-  const gold = m.free ? 'color:#d4af37; font-weight:600;' : '';
+  const gold = (m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive')) ? 'color:#d4af37; font-weight:600;' : '';
   const titleHtml = `<span style="${gold}">${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
@@ -463,7 +463,7 @@ function showDetails(id) {
     const links = m.freeLinks || [];
     const bestFree = links[0];
     const otherFree = links.slice(1);
-    const isFree = m.free || links.length > 0;
+    const isFree = m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive');
     const titleStyle = isFree ? 'color:#d4af37;' : '';
 
     modal.innerHTML = `
@@ -689,7 +689,7 @@ function renderDecades() {
           </div>
           ${m.poster ? `<img src="https://image.tmdb.org/t/p/w92${m.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
           <div style="flex:1; cursor:pointer;" onclick="showDetails('${m.id}')">
-            <div class="title" style="${m.free ? 'color:#d4af37; font-weight:600;' : ''}">${escapeHtml(m.title)}</div>
+            <div class="title" style="${(m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive')) ? 'color:#d4af37; font-weight:600;' : ''}">${escapeHtml(m.title)}</div>
             <div class="meta">${m.year || ''}</div>
           </div>
           <span class="rating">${m.rating}%</span>
@@ -1824,7 +1824,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.107</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.108</p>
   `;
 }
 
@@ -1875,8 +1875,9 @@ async function backfillFree() {
       const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
       const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}`).then(r => r.json());
       const sources = await findFreeSources(m.title, det.runtime || 0);
-      m.free = sources.length > 0;
-      if (sources.length) m.freeLinks = sources;
+      m.free = sources.length > 0 && sources.some(s => s[0] === 'Internet Archive');
+      if (m.free) m.freeLinks = sources;
+      else m.freeLinks = [];
     } catch { m.free = false; }
   }
   if (unchecked.length) { save(); render(); }
