@@ -748,6 +748,27 @@ async function findFreeSources(title, runtimeMin) {
       break;
     }
   } catch {}
+  const ytKey = localStorage.getItem('youtubeKey');
+  if (ytKey && runtimeMin) {
+    try {
+      const search = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}+full+movie&type=video&videoDuration=long&maxResults=5&key=${ytKey}`).then(r => r.json());
+      const ids = (search.items || []).map(i => i.id.videoId).filter(Boolean);
+      if (ids.length) {
+        const details = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${ids.join(',')}&key=${ytKey}`).then(r => r.json());
+        for (const v of (details.items || [])) {
+          const dur = v.contentDetails?.duration || '';
+          const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+          if (!match) continue;
+          const mins = (+match[1] || 0) * 60 + (+match[2] || 0);
+          if (Math.abs(mins - runtimeMin) > 20) continue;
+          const vTitle = (v.snippet?.title || '').toLowerCase();
+          if (!vTitle.includes(title.toLowerCase().slice(0, Math.min(8, title.length)))) continue;
+          sources.push(['YouTube', `https://www.youtube.com/watch?v=${v.id}`]);
+          break;
+        }
+      }
+    } catch {}
+  }
   return sources;
 }
 
@@ -1792,6 +1813,8 @@ function renderSettings() {
       <p class="backup-note">Search, details, seasonal, and recommendations need a free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org/settings/api</a>.</p>
       <input id="settingsKey" type="text" value="${escapeHtml(key)}" placeholder="Paste your TMDB key" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-bottom:10px;">
       <button type="button" onclick="saveApiKey()" style="background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save Key</button>
+      <input id="youtubeKey" type="text" value="${escapeHtml(localStorage.getItem('youtubeKey') || '')}" placeholder="YouTube API key (optional)" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-top:10px; margin-bottom:10px;">
+      <button type="button" onclick="saveYoutubeKey()">Save YouTube Key</button>
     </div>
     <div class="backup-box">
       <div class="stat-label" style="margin-bottom:6px;">Library Backup</div>
@@ -1813,8 +1836,22 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.102</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.103</p>
   `;
+}
+
+function saveYoutubeKey() {
+  const input = document.getElementById('youtubeKey');
+  if (!input) return;
+  const key = input.value.trim();
+  if (!key) {
+    localStorage.removeItem('youtubeKey');
+    showToast('YouTube key cleared');
+  } else {
+    localStorage.setItem('youtubeKey', key);
+    showToast('YouTube key saved');
+  }
+  renderSettings();
 }
 
 function saveApiKey() {
