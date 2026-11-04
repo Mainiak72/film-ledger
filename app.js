@@ -767,7 +767,7 @@ async function renderFree(page = 1) {
   const rows = 20;
   try {
     const q = encodeURIComponent(`mediatype:movies${yearFilter} AND -title:trailer AND -title:teaser AND -title:clip`);
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year,runtime&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
     const data = await r.json();
     const docs = data.response?.docs || [];
     if (!docs.length) {
@@ -1856,7 +1856,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.113</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.114</p>
   `;
 }
 
