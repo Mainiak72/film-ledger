@@ -734,7 +734,7 @@ async function findFreeSources(title, runtimeMin) {
       const id = doc.identifier;
       if (!id) continue;
       const docTitle = (Array.isArray(doc.title) ? doc.title[0] : doc.title || '').toLowerCase();
-      if (!docTitle.includes(title.toLowerCase().slice(0, 10))) continue;
+      if (!docTitle.includes(title.toLowerCase().slice(0, Math.min(10, title.length)))) continue;
       let mins = 0;
       if (doc.runtime) {
         const parts = String(doc.runtime).match(/\d+/g);
@@ -742,8 +742,8 @@ async function findFreeSources(title, runtimeMin) {
         else if (parts && parts.length === 2) mins = +parts[0];
         else if (parts) mins = +parts[0];
       }
-      if (runtimeMin && mins && Math.abs(mins - runtimeMin) > 20) continue;
-      if (!mins && runtimeMin) continue;
+      if (!mins) continue;
+      if (runtimeMin && Math.abs(mins - runtimeMin) > 20) continue;
       sources.push(['Internet Archive', `https://archive.org/details/${id}`]);
       break;
     }
@@ -1813,7 +1813,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.101</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.102</p>
   `;
 }
 
