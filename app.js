@@ -793,10 +793,13 @@ async function showVerifiedFree(el, results, endpoint, apiKey, page) {
       const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}`).then(r => r.json());
       const runtime = det.runtime || 0;
       if (!runtime) return;
-      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title,runtime&output=json&rows=5`).then(r => r.json());
+      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title,runtime,subject&output=json&rows=5`).then(r => r.json());
       const doc = (ia.response?.docs || []).find(d => {
-        const dt = (Array.isArray(d.title) ? d.title[0] : d.title || '').toLowerCase();
-        if (!dt.includes(title.toLowerCase().slice(0, Math.min(10, title.length)))) return false;
+        const dt = (Array.isArray(d.title) ? d.title[0] : d.title || '').toLowerCase().trim();
+        const q = title.toLowerCase().trim();
+        if (dt !== q && !dt.startsWith(q + ' ') && !dt.includes(' ' + q)) return false;
+        const subjects = Array.isArray(d.subject) ? d.subject.join(' ').toLowerCase() : String(d.subject || '').toLowerCase();
+        if (subjects && !/(movie|film|feature|cinema)/.test(subjects)) return false;
         let mins = 0;
         if (d.runtime) {
           const parts = String(d.runtime).match(/\d+/g);
@@ -804,7 +807,7 @@ async function showVerifiedFree(el, results, endpoint, apiKey, page) {
           else if (parts && parts.length === 2) mins = +parts[0];
           else if (parts) mins = +parts[0];
         }
-        return mins && Math.abs(mins - runtime) <= 20;
+        return mins && Math.abs(mins - runtime) <= 15;
       });
       if (doc) verified.push({ m, title, iaId: doc.identifier });
     } catch {}
@@ -1857,7 +1860,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.119</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.120</p>
   `;
 }
 
