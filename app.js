@@ -805,9 +805,6 @@ async function renderFree(page = 1) {
       const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
       const addBtn = existing ? '' : `<button onclick="addFromSearch(${tmdb.id}, '${jsArg(title)}', '${year}', '', '', 'movie', '${tmdb.poster_path || ''}', 'streaming', true)">Add</button>`;
       const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
-      const gold = 'color:#d4af37; font-weight:600;';
-      const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
-      const smallPoster = `<img src="${poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;" onerror="this.style.display='none'">`;
       const overview = (tmdb.overview || '').slice(0, 140);
       const desc = overview ? `<div class="poster-desc">${escapeHtml(overview)}${overview.length >= 140 ? '…' : ''}</div>` : '';
       if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
@@ -1093,6 +1090,7 @@ function searchMovies(page = 1) {
 
   const resultsEl = document.getElementById('searchResults');
   resultsEl.innerHTML = '<div class="empty">Searching...</div>';
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   const yearMatch = query.match(/^(19|20)\d{2}$/);
   const genreMap = {
@@ -1879,7 +1877,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.116</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.117</p>
   `;
 }
 

@@ -136,7 +136,10 @@ html {
 }
 
 .suggestions {
+  position: relative;
+  z-index: 200;
   padding: 0 16px;
+  background: #1a1714;
 }
 
 .suggestions:empty { display: none; }
