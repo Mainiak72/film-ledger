@@ -42,6 +42,8 @@ function tabHead(titleHtml, tabId, refreshKind) {
     ? `<button type="button" class="refresh-btn" onclick="renderSeasonal(seasonalPage + 1)">Refresh</button>`
     : refreshKind === 'recs'
     ? `<button type="button" class="refresh-btn" onclick="renderRecommendations(recsPage + 1)">Refresh</button>`
+    : refreshKind === 'free'
+    ? `<button type="button" class="refresh-btn" onclick="renderFree(freePage)">Refresh</button>`
     : '';
   return `<div class="tab-head"><div class="tab-title">${titleHtml}</div><div class="tab-tools">${viewToggle(tabId)}${refresh}</div></div>`;
 }
@@ -458,10 +460,10 @@ function showDetails(id) {
       ? `<img src="https://image.tmdb.org/t/p/w342${m.poster}" alt="" style="width:92px; height:138px; object-fit:cover; border-radius:6px; flex-shrink:0;">`
       : '<div style="width:92px; height:138px; background:#222; border-radius:6px; flex-shrink:0;"></div>';
 
-    const links = freeLinks(m.title);
+    const links = m.freeLinks || [];
     const bestFree = links[0];
     const otherFree = links.slice(1);
-    const isFree = free.length > 0;
+    const isFree = m.free || links.length > 0;
     const titleStyle = isFree ? 'color:#d4af37;' : '';
 
     modal.innerHTML = `
@@ -474,7 +476,7 @@ function showDetails(id) {
           ${posterBlock}
           <div style="flex:1;">
             <div style="margin-bottom:6px;">${originBadge}${trailerLink}</div>
-            <a href="${bestFree[1]}" target="_blank" rel="noopener" style="display:block; background:#d4af37; color:#1a1408; text-align:center; padding:8px; border-radius:8px; font-weight:700; text-decoration:none; font-size:0.85rem;">Watch Free</a>
+            <a href="${bestFree ? bestFree[1] : '#'}" target="_blank" rel="noopener" style="display:block; background:#d4af37; color:#1a1408; text-align:center; padding:8px; border-radius:8px; font-weight:700; text-decoration:none; font-size:0.85rem;">${bestFree ? 'Watch Free' : 'No free link'}</a>
           </div>
         </div>
         <p style="color:#ddd; font-size:0.85rem; line-height:1.4; margin-bottom:10px;">${escapeHtml(overview)}</p>
@@ -483,7 +485,7 @@ function showDetails(id) {
           <div>${escapeHtml(cast)}</div>
         </div>
         <div style="font-size:0.7rem; color:#888; margin-bottom:10px;">
-          Also free: ${otherFree.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); const w = window.open(''); resolveArchiveLink('${jsArg(m.title)}').then(u => { if(w) w.location = u; else window.open(u); })" style="color:#d4af37; margin-right:8px;">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
+          Also free: ${otherFree.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
         </div>
         <div style="border-top:1px solid #2e2820; padding-top:10px;">
           <div class="item-actions" style="margin-bottom:8px;">
@@ -731,13 +733,14 @@ async function findFreeSources(title, runtimeMin) {
   const sources = [];
   const q = encodeURIComponent(title);
   try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer&fl=identifier,runtime,title&output=json&rows=5&sort[]=downloads+desc`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,runtime,title&output=json&rows=10&sort[]=downloads+desc`);
     const data = await r.json();
     for (const doc of (data.response?.docs || [])) {
       const id = doc.identifier;
       if (!id) continue;
       const docTitle = (Array.isArray(doc.title) ? doc.title[0] : doc.title || '').toLowerCase();
-      if (!docTitle.includes(title.toLowerCase().slice(0, Math.min(10, title.length)))) continue;
+      if (!docTitle.includes(title.toLowerCase().slice(0, Math.min(8, title.length)))) continue;
+      if (docTitle.includes('trailer') || docTitle.includes('teaser')) continue;
       let mins = 0;
       if (doc.runtime) {
         const parts = String(doc.runtime).match(/\d+/g);
@@ -747,7 +750,7 @@ async function findFreeSources(title, runtimeMin) {
       }
       if (!mins) continue;
       if (runtimeMin && Math.abs(mins - runtimeMin) > 20) continue;
-      sources.push(['Internet Archive', `https://archive.org/details/${id}`]);
+      sources.push(['Internet Archive', `https://archive.org/embed/${id}`]);
       break;
     }
   } catch {}
@@ -822,7 +825,7 @@ async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) 
   if (!verified.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No verified free ${typeLabel.toLowerCase()} on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`; return; }
   const view = getViewMode('free');
   const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
+  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, sources }) => {
     const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
     const posterPath = m.poster_path || '';
     const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
@@ -1842,7 +1845,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.105</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.106</p>
   `;
 }
 
@@ -1887,13 +1890,14 @@ function showTab(tab) {
 async function backfillFree() {
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) return;
-  const unchecked = movies.filter(m => m.tmdbId && m.free == null).slice(0, 10);
+  const unchecked = movies.filter(m => m.tmdbId && m.free == null).slice(0, 15);
   for (const m of unchecked) {
     try {
       const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
       const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}`).then(r => r.json());
       const sources = await findFreeSources(m.title, det.runtime || 0);
       m.free = sources.length > 0;
+      if (sources.length) m.freeLinks = sources;
     } catch { m.free = false; }
   }
   if (unchecked.length) { save(); render(); }
