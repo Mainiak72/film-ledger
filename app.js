@@ -226,7 +226,7 @@ function renderList(tabId, filter) {
   if (searchable) {
     html += `<div style="margin-bottom:12px; display:flex; gap:6px;">
       <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
-      ${tabId === 'watchlist' ? `<select id="watchlistGenre" multiple onchange="filterTab('watchlist')" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:8px; height:32px;"><option value="">All genres</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}</select>` : ''}
+      ${tabId === 'watchlist' ? watchlistFilterBar() : ''}
     </div><div id="${tabId}List" class="list-container ${view}">`;
   } else {
     html += `<div class="list-container ${view}">`;
@@ -241,11 +241,33 @@ function renderList(tabId, filter) {
   el.innerHTML = html;
 }
 
+let watchlistFilters = { genres: [] };
+
+function addWatchlistFilter(genre) {
+  if (!watchlistFilters.genres.includes(genre)) watchlistFilters.genres.push(genre);
+  renderList('watchlist', m => m.status === 'watchlist');
+}
+function removeWatchlistFilter(genre) {
+  watchlistFilters.genres = watchlistFilters.genres.filter(g => g !== genre);
+  renderList('watchlist', m => m.status === 'watchlist');
+}
+function watchlistFilterBar() {
+  const genres = [...new Set(movies.filter(m => m.status === 'watchlist').map(m => m.genre).filter(Boolean))];
+  const active = watchlistFilters.genres.map(g => `<span class="filter-chip" onclick="removeWatchlistFilter('${escapeHtml(g)}')">${escapeHtml(g)} ×</span>`).join('');
+  return `<div class="free-filters">
+    <button type="button" onclick="document.getElementById('watchlistAdd').classList.toggle('hide')">+ Filter</button>
+    <div id="watchlistAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+      <select onchange="if(this.value){addWatchlistFilter(this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
+        <option value="">Genre</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
+  </div>`;
+}
 function filterTab(tabId) {
   refreshTopSets();
   const query = document.getElementById(tabId + 'Search').value.toLowerCase().trim();
-  const genreSel = document.getElementById('watchlistGenre');
-  const genres = tabId === 'watchlist' && genreSel ? [...genreSel.selectedOptions].map(o => o.value).filter(Boolean) : [];
+  const genres = tabId === 'watchlist' ? watchlistFilters.genres : [];
   const listEl = document.getElementById(tabId + 'List');
   const view = getViewMode(tabId);
   let list = filtered();
@@ -1761,7 +1783,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.91</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.92</p>
   `;
 }
 
