@@ -760,28 +760,56 @@ async function findFreeSources(title, runtimeMin) {
 async function renderFree(page = 1) {
   freePage = page;
   const el = document.getElementById('free');
-  const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = freeFilterBar() + '<div class="empty">Checking free titles...</div>';
-  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
-  if (!freeFilters.decades.length) url += '&primary_release_date.gte=1940-01-01&primary_release_date.lte=1979-12-31';
-  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
-  if (freeFilters.decades.length) {
-    const fetches = freeFilters.decades.map(d => {
-      const dateParam = endpoint === 'tv' ? `&first_air_date.gte=${d}-01-01&first_air_date.lte=${d+9}-12-31` : `&primary_release_date.gte=${d}-01-01&primary_release_date.lte=${d+9}-12-31`;
-      return fetch(url + dateParam).then(r => r.json()).then(data => data.results || []).catch(() => []);
-    });
-    const all = await Promise.all(fetches);
-    const seen = new Set();
-    const results = [];
-    all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
-    await showVerifiedFree(el, results.slice(0, 40), endpoint, typeLabel, apiKey, page);
-    return;
+  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free movies from Internet Archive...</div>';
+  const yearStart = freeFilters.decades.length ? Math.min(...freeFilters.decades) : 1940;
+  const yearEnd = freeFilters.decades.length ? Math.max(...freeFilters.decades) + 9 : 1979;
+  const rows = 20;
+  const start = (page - 1) * rows;
+  try {
+    const q = encodeURIComponent(`mediatype:movies AND year:[${yearStart} TO ${yearEnd}] AND runtime:* AND -title:trailer AND -title:teaser AND -title:clip`);
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=${q}&fl=identifier,title,year,runtime&output=json&rows=${rows}&page=${page}&sort[]=downloads+desc`);
+    const data = await r.json();
+    const docs = data.response?.docs || [];
+    if (!docs.length) {
+      el.innerHTML = freeFilterBar() + `<div class="empty">No free movies found.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}</div>`;
+      return;
+    }
+    const view = getViewMode('free');
+    const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
+    el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + docs.map(doc => {
+      const title = Array.isArray(doc.title) ? doc.title[0] : (doc.title || 'Unknown');
+      const year = doc.year || '';
+      const id = doc.identifier;
+      const link = `https://archive.org/embed/${id}`;
+      const existing = movies.find(x => x.title && x.title.toLowerCase() === title.toLowerCase());
+      const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+      const addBtn = existing ? '' : `<button onclick="addFreeFromIA('${jsArg(title)}', '${year}', '${id}')">Add</button>`;
+      const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
+      const gold = 'color:#d4af37; font-weight:600;';
+      if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
+      return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;"><div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div>${watchBtn}${addBtn}</div></div></div>`;
+    }).join('') + '</div>' + pager;
+  } catch (e) {
+    el.innerHTML = freeFilterBar() + `<div class="empty">Could not load Internet Archive. Try again.</div>`;
   }
-  const data = await fetch(url).then(r => r.json()).catch(() => ({ results: [] }));
-  await showVerifiedFree(el, (data.results || []).slice(0, 40), endpoint, typeLabel, apiKey, page);
+}
+
+function addFreeFromIA(title, year, iaId) {
+  const id = 'ia-' + iaId;
+  if (movies.find(m => m.id === id)) { showToast('Already in library'); return; }
+  movies.push({
+    id,
+    title,
+    year: year ? +year : null,
+    status: 'watchlist',
+    mediaType: 'movie',
+    free: true,
+    freeLinks: [['Internet Archive', `https://archive.org/embed/${iaId}`]],
+    added: Date.now()
+  });
+  save();
+  showToast('Added to watchlist');
+  render();
 }
 
 async function showVerifiedFree(el, results, endpoint, typeLabel, apiKey, page) {
@@ -1824,7 +1852,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.109</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.110</p>
   `;
 }
 
