@@ -1782,7 +1782,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.94</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.95</p>
   `;
 }
 
@@ -1805,6 +1805,9 @@ function showTab(tab) {
   document.querySelectorAll('#subnav button').forEach(b => b.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
   document.querySelector(`#subnav button[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'free') renderFree(freePage);
+  else if (tab === 'recs') renderRecommendations(recsPage);
+  else if (tab === 'seasonal') renderSeasonal(seasonalPage);
 }
 
 async function backfillPosters() {
