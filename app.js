@@ -801,8 +801,8 @@ function freeFilterBar() {
   const active = [...freeFilters.decades.map(d => `<span class="filter-chip" onclick="removeFreeFilter('decades', ${d})">${d}s ×</span>`),
     ...freeFilters.genres.map(g => `<span class="filter-chip" onclick="removeFreeFilter('genres', '${g}')">${g} ×</span>`)].join('');
   return `<div class="free-filters">
-    <button type="button" onclick="document.getElementById('freeAdd').hidden = !document.getElementById('freeAdd').hidden">+ Filter</button>
-    <div id="freeAdd" hidden style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+    <button type="button" onclick="document.getElementById('freeAdd').classList.toggle('hide')">+ Filter</button>
+    <div id="freeAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
       <select onchange="if(this.value){addFreeFilter('decades', +this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
         <option value="">Decade</option>${DECADES.map(d => `<option value="${d}">${d}s</option>`).join('')}
       </select>
@@ -1761,7 +1761,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.90</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.91</p>
   `;
 }
 
