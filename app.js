@@ -1083,7 +1083,7 @@ function searchMovies(page = 1) {
   // Year-only search
   if (yearMatch && query.length === 4) {
     const year = query;
-    const endpoint = window.currentMode === 'tv' ? 'tv' : 'movie';
+    const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
     const yearParam = endpoint === 'tv' ? `first_air_date_year=${year}` : `primary_release_year=${year}`;
     fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&${yearParam}&language=en-US&sort_by=popularity.desc&page=${page}`)
       .then(r => r.json())
@@ -1095,7 +1095,7 @@ function searchMovies(page = 1) {
   // Genre search
   if (genreKey && query.toLowerCase().split(/\s+/).length <= 3) {
     const genreId = genreMap[genreKey];
-    const endpoint = window.currentMode === 'tv' ? 'tv' : 'movie';
+    const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
     fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&sort_by=popularity.desc&page=${page}`)
       .then(r => r.json())
       .then(data => renderDiscoverResults(data, resultsEl, page, endpoint, apiKey))
@@ -1856,7 +1856,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.111</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.112</p>
   `;
 }
 
