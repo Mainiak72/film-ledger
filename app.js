@@ -854,7 +854,7 @@ function renderFree(page = 1) {
   el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`;
+  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false&primary_release_date.lte=2011-12-31`;
   if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
   if (freeFilters.decades.length) {
     const fetches = freeFilters.decades.map(d => {
@@ -1793,7 +1793,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.97</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.98</p>
   `;
 }
 
