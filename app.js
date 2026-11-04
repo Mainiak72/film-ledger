@@ -783,35 +783,70 @@ function renderRecommendations(page = 1) {
   });
 }
 
+let freeFilters = { decades: [], genres: [] };
+const GENRES = { action: 28, adventure: 12, animation: 16, comedy: 35, crime: 80, documentary: 99, drama: 18, family: 10751, fantasy: 14, horror: 27, mystery: 9648, romance: 10749, 'sci-fi': 878, thriller: 53, war: 10752, western: 37 };
+const DECADES = [2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950, 1940];
+
+function addFreeFilter(type, value) {
+  if (!freeFilters[type].includes(value)) freeFilters[type].push(value);
+  renderFree(1);
+}
+function removeFreeFilter(type, value) {
+  freeFilters[type] = freeFilters[type].filter(v => v !== value);
+  renderFree(1);
+}
+function freeFilterBar() {
+  const active = [...freeFilters.decades.map(d => `<span class="filter-chip" onclick="removeFreeFilter('decades', ${d})">${d}s ×</span>`),
+    ...freeFilters.genres.map(g => `<span class="filter-chip" onclick="removeFreeFilter('genres', '${g}')">${g} ×</span>`)].join('');
+  return `<div class="free-filters">
+    <button type="button" onclick="document.getElementById('freeAdd').hidden = !document.getElementById('freeAdd').hidden">+ Filter</button>
+    <div id="freeAdd" hidden style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+      <select onchange="if(this.value){addFreeFilter('decades', +this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
+        <option value="">Decade</option>${DECADES.map(d => `<option value="${d}">${d}s</option>`).join('')}
+      </select>
+      <select onchange="if(this.value){addFreeFilter('genres', this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
+        <option value="">Genre</option>${Object.keys(GENRES).map(g => `<option value="${g}">${g}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
+  </div>`;
+}
+
 function renderFree(page = 1) {
   freePage = page;
   const el = document.getElementById('free');
   const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = '<div class="empty">Loading free titles...</div>';
+  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
+  el.innerHTML = freeFilterBar() + '<div class="empty">Loading free titles...</div>';
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_watch_providers=73|300|538&watch_region=US&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
-    .then(r => r.json()).then(data => {
-      const results = (data.results || []).slice(0, 10);
-      if (!results.length) { el.innerHTML = `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
-      const view = getViewMode('free');
-      const halo = 'box-shadow:0 0 0 1px #d4af37;';
-      el.innerHTML = tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + results.map(m => {
-        const title = endpoint === 'tv' ? m.name : m.title;
-        const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-        const posterPath = m.poster_path || '';
-        const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-        const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-        const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
-        const links = freeLinksHtml(title);
-        const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster" style="${halo}">` : `<div class="poster poster-placeholder" style="${halo}"></div>`;
-        const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px; ${halo}">` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px; ${halo}"></div>`;
-        if (view === 'bullet') return `<div class="bullet-item" style="${halo}" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
-        if (view === 'large') return `<div class="poster-card" style="${halo}"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
-        return `<div class="card" style="padding:8px; ${halo}"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
-      }).join('') + '</div>';
-    }).catch(() => el.innerHTML = '<div class="empty">Failed to load free titles.</div>');
+  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false&with_watch_monetization_types=free&watch_region=US`;
+  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
+  if (freeFilters.decades.length) {
+    const min = Math.min(...freeFilters.decades);
+    const max = Math.max(...freeFilters.decades) + 9;
+    url += endpoint === 'tv' ? `&first_air_date.gte=${min}-01-01&first_air_date.lte=${max}-12-31` : `&primary_release_date.gte=${min}-01-01&primary_release_date.lte=${max}-12-31`;
+  }
+  fetch(url).then(r => r.json()).then(data => {
+    const results = (data.results || []).slice(0, 10);
+    if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
+    const view = getViewMode('free');
+    const halo = 'box-shadow:0 0 0 1px #d4af37;';
+    el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + results.map(m => {
+      const title = endpoint === 'tv' ? m.name : m.title;
+      const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+      const posterPath = m.poster_path || '';
+      const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
+      const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+      const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
+      const links = freeLinksHtml(title);
+      const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster" style="${halo}">` : `<div class="poster poster-placeholder" style="${halo}"></div>`;
+      const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px; ${halo}">` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px; ${halo}"></div>`;
+      if (view === 'bullet') return `<div class="bullet-item" style="${halo}" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
+      if (view === 'large') return `<div class="poster-card" style="${halo}"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
+      return `<div class="card" style="padding:8px; ${halo}"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+    }).join('') + '</div>';
+  }).catch(() => el.innerHTML = freeFilterBar() + '<div class="empty">Failed to load free titles.</div>');
 }
 
 function onSearchInput() {
@@ -1647,16 +1682,15 @@ function renderStats() {
 }
 
 const ALL_TABS = [
-  ['seasonal', 'Seasonal'],
   ['watchlist', 'Watchlist'],
   ['watching', 'Watching'],
   ['alltime', 'Watched'],
-  ['recs', 'Recommended'],
-  ['free', 'Free'],
   ['top10', 'Top 10'],
   ['decades', 'Decades'],
-  ['least', 'Least'],
-  ['stats', 'Stats']
+  ['stats', 'Stats'],
+  ['recs', 'Recommended'],
+  ['seasonal', 'Seasonal'],
+  ['free', 'Free']
 ];
 
 function visibleTabs() {
@@ -1716,7 +1750,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.87</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.88</p>
   `;
 }
 
