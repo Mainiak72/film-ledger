@@ -458,12 +458,12 @@ function showDetails(id) {
     const bestFree = links[0];
     const otherFree = links.slice(1);
     const isFree = free.length > 0;
-    const halo = isFree ? 'box-shadow:0 0 0 1px #d4af37;' : '';
+    const titleStyle = isFree ? 'color:#d4af37;' : '';
 
     modal.innerHTML = `
       <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:380px; width:100%; padding:14px; max-height:85vh; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h3 style="font-size:1rem;">${escapeHtml(m.title)}</h3>
+          <h3 style="font-size:1rem; ${titleStyle}">${escapeHtml(m.title)}</h3>
           <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -727,14 +727,25 @@ function freeLinks(title) {
   const q = encodeURIComponent(title);
   return [
     ['YouTube', `https://www.youtube.com/results?search_query=${q}+full+movie`],
-    ['Internet Archive', `https://archive.org/search.php?query=${q}`],
+    ['Internet Archive', `https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies&fl=identifier&output=json&rows=1`],
     ['Plex', `https://watch.plex.tv/search?q=${q}`],
     ['Tubi', `https://tubitv.com/search/${q}`],
     ['Pluto', `https://pluto.tv/search?q=${q}`]
   ];
 }
+async function resolveArchiveLink(title) {
+  const q = encodeURIComponent(title);
+  try {
+    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies&fl=identifier&output=json&rows=1`);
+    const data = await r.json();
+    const id = data.response?.docs?.[0]?.identifier;
+    if (id) return `https://archive.org/details/${id}`;
+  } catch {}
+  return `https://archive.org/search.php?query=${q}+AND+mediatype:movies`;
+}
 function freeLinksHtml(title) {
-  return `<div class="free-links">${freeLinks(title).map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
+  const links = freeLinks(title);
+  return `<div class="free-links">${links.map(([n, u]) => n === 'Internet Archive' ? `<a href="#" onclick="event.preventDefault(); resolveArchiveLink('${jsArg(title)}').then(u => window.open(u))">${n}</a>` : `<a href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}</div>`;
 }
 
 function renderSeasonal(page = 1) {
@@ -864,7 +875,6 @@ function renderFree(page = 1) {
 function showFreeResults(el, results, endpoint, typeLabel) {
   if (!results.length) { el.innerHTML = freeFilterBar() + `<div class="empty">No free ${typeLabel.toLowerCase()} found.</div>`; return; }
   const view = getViewMode('free');
-  const halo = 'box-shadow:0 0 0 1px #d4af37;';
   el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free') + `<div class="list-container ${view}">` + results.map(m => {
     const title = endpoint === 'tv' ? m.name : m.title;
     const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -873,11 +883,12 @@ function showFreeResults(el, results, endpoint, typeLabel) {
     const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
     const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
     const links = freeLinksHtml(title);
-    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster" style="${halo}">` : `<div class="poster poster-placeholder" style="${halo}"></div>`;
-    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px; ${halo}">` : `<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px; ${halo}"></div>`;
-    if (view === 'bullet') return `<div class="bullet-item" style="${halo}" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
-    if (view === 'large') return `<div class="poster-card" style="${halo}"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
-    return `<div class="card" style="padding:8px; ${halo}"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
+    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
+    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+    const gold = 'color:#d4af37;';
+    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${endpoint}')"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>${links}`;
+    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}${links}</div></div>`;
+    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center; cursor:pointer;" onclick="showSearchDetails(${m.id}, '${endpoint}')">${small}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>${links}</div>`;
   }).join('') + '</div>';
 }
 
@@ -1782,7 +1793,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.95</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.96</p>
   `;
 }
 
