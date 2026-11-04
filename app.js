@@ -252,13 +252,13 @@ function removeWatchlistFilter(genre) {
   renderList('watchlist', m => m.status === 'watchlist');
 }
 function watchlistFilterBar() {
-  const genres = [...new Set(movies.filter(m => m.status === 'watchlist').map(m => m.genre).filter(Boolean))];
+  const allGenres = [...new Set(movies.filter(m => m.status === 'watchlist').flatMap(m => (m.genre || '').split(',').map(g => g.trim()).filter(Boolean)))].sort();
   const active = watchlistFilters.genres.map(g => `<span class="filter-chip" onclick="removeWatchlistFilter('${escapeHtml(g)}')">${escapeHtml(g)} ×</span>`).join('');
   return `<div class="free-filters">
     <button type="button" onclick="document.getElementById('watchlistAdd').classList.toggle('hide')">+ Filter</button>
     <div id="watchlistAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
       <select onchange="if(this.value){addWatchlistFilter(this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
-        <option value="">Genre</option>${genres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
+        <option value="">Genre</option>${allGenres.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('')}
       </select>
     </div>
     <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
@@ -275,7 +275,7 @@ function filterTab(tabId) {
   else if (tabId === 'watching') list = list.filter(m => m.status === 'watching');
   else if (tabId === 'alltime') list = list.filter(m => m.status === 'watched');
   list = list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  if (genres.length) list = list.filter(m => genres.some(g => (m.genre || '').includes(g)));
+  if (genres.length) list = list.filter(m => genres.some(g => (m.genre || '').split(',').map(x => x.trim()).includes(g)));
 
   const filteredList = query 
     ? list.filter(m => m.title.toLowerCase().includes(query) || (m.genre && m.genre.toLowerCase().includes(query)))
@@ -1783,7 +1783,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.92</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.93</p>
   `;
 }
 
