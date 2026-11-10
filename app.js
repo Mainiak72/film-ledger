@@ -237,6 +237,24 @@ function assignFolder(id) {
   render();
 }
 
+
+function renderSearchTab() {
+  const el = document.getElementById('search');
+  if (!el) return;
+  const apiKey = localStorage.getItem('tmdbKey') || '';
+  el.innerHTML = `
+    <div class="search-bar" style="margin-bottom:12px;">
+      <div class="search-row">
+        <input id="searchQuery" type="text" placeholder="Search title, actor, director, year..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter') searchMovies()" style="flex:1;">
+        <button type="button" onclick="searchMovies()">Search</button>
+      </div>
+    </div>
+    <div id="suggestions" class="suggestions"></div>
+    <div id="searchResults"></div>
+    ${apiKey ? '' : '<div class="empty">Add your TMDB API key in Settings to search.</div>'}
+  `;
+}
+
 function render() {
   refreshTopSets();
   renderList('watchlist', m => m.status === 'watchlist');
@@ -249,6 +267,7 @@ function render() {
   renderRecommendations(recsPage);
   renderStats();
   renderSettings();
+  renderSearchTab();
 }
 
 function renderList(tabId, filter) {
@@ -1629,6 +1648,8 @@ const ALL_TABS = [
   ['stats', 'Stats'],
   ['recs', 'Recommended'],
   ['seasonal', 'Seasonal'],
+  ['search', 'Search'],
+  ['settings', 'Settings']
 ];
 
 function visibleTabs() {
@@ -1688,7 +1709,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.127</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.128</p>
   `;
 }
 
@@ -1704,6 +1725,7 @@ function saveApiKey() {
     showToast('API key saved');
   }
   renderSettings();
+  renderSearchTab();
 }
 
 function showTab(tab) {
@@ -1713,51 +1735,7 @@ function showTab(tab) {
   document.querySelector(`#subnav button[data-tab="${tab}"]`).classList.add('active');
   if (tab === 'recs') renderRecommendations(recsPage);
   else if (tab === 'seasonal') renderSeasonal(seasonalPage);
-}
-
-async function backfillFree() {
-  const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) return;
-  const unchecked = movies.filter(m => m.tmdbId && m.free == null).slice(0, 15);
-  for (const m of unchecked) {
-    try {
-      const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
-      const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}`).then(r => r.json());
-      const sources = await findFreeSources(m.title, det.runtime || 0);
-      m.free = sources.length > 0 && sources.some(s => s[0] === 'Internet Archive');
-      if (m.free) m.freeLinks = sources;
-      else m.freeLinks = [];
-    } catch { m.free = false; }
-  }
-  if (unchecked.length) { save(); render(); }
-}
-
-async function backfillPosters() {
-  const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) return;
-  const missing = movies.filter(m => m.tmdbId && (!m.poster || !m.origin));
-  if (missing.length === 0) return;
-
-  for (const m of missing) {
-    try {
-      const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
-      const res = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}&append_to_response=release_dates`);
-      const data = await res.json();
-      if (data.poster_path && !m.poster) m.poster = data.poster_path;
-      if (!m.origin) {
-        const usRelease = data.release_dates?.results?.find(r => r.iso_3166_1 === 'US');
-        const hasTheatrical = endpoint === 'movie' && usRelease?.release_dates?.some(d => d.type === 3);
-        m.origin = hasTheatrical ? 'theatrical' : 'streaming';
-      }
-    } catch (e) {}
-  }
-  save();
-  render();
-}
-
-function sizeTop() {
-  const top = document.querySelector('.sticky-top');
-  if (top) document.documentElement.style.setProperty('--top-h', top.offsetHeight + 'px');
+  else if (tab === 'search') renderSearchTab();
 }
 
 function startLedger() {
