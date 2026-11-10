@@ -398,32 +398,123 @@ button:hover {
 nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 4px;
-  padding: 6px 12px 8px;
+  gap: 4px;
+  padding: 8px 12px 10px;
   justify-content: center;
+  align-items: center;
 }
 
 nav button {
   background: transparent;
   color: var(--muted);
-  border: none;
-  padding: 6px 10px;
-  border-radius: 0;
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 0.82rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  line-height: 1;
+  min-height: 32px;
 }
 
 nav button.tab-hidden { display: none; }
 
 nav button.active {
-  background: transparent;
+  background: rgba(212, 175, 55, 0.12);
   color: var(--accent);
-  border: none;
-  letter-spacing: 0.02em;
-  font-size: 0.9rem;
+  border-color: var(--accent);
+  font-size: 0.82rem;
   font-weight: 700;
+}
+
+.watch-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.folder-side {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  position: sticky;
+  top: 8px;
+}
+
+.folder-head {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.folder-item,
+.folder-add {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+
+.folder-item.on {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.folder-count {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.folder-add {
+  margin-top: 8px;
+  border-color: var(--border);
+  color: var(--accent);
+  justify-content: center;
+}
+
+.watch-main { min-width: 0; }
+
+.tab-tools-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tab-search-input {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+@media (max-width: 700px) {
+  .watch-layout {
+    grid-template-columns: 1fr;
+  }
+  .folder-side {
+    position: static;
+  }
 }
 
 .container {

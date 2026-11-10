@@ -55,6 +55,7 @@ function libraryButtons(m, rank) {
   return `<button onclick="showDetails('${m.id}')">Details</button>`
     + (m.status !== 'watchlist' ? `<button onclick="setStatus('${m.id}', 'watchlist')">Watchlist</button>` : '')
     + (m.status !== 'watching' ? `<button onclick="setStatus('${m.id}', 'watching')">Watching</button>` : '')
+    + (m.status === 'watchlist' ? `<button onclick="assignFolder('${m.id}')">Folder</button>` : '')
     + rate + del;
 }
 function viewToggle(tabId) {
@@ -203,21 +204,39 @@ function renderItem(m, view, rank) {
 }
 
 
-function folderBarHtml() {
-  const folders = [...new Set(movies.filter(m => m.status === 'watchlist' && m.folder).map(m => m.folder))].sort();
+function allFolders() {
+  const fromMovies = movies.filter(m => m.folder).map(m => m.folder);
+  return [...new Set([...(customFolders || []), ...fromMovies])].filter(Boolean).sort();
+}
+
+function saveFolders() {
+  localStorage.setItem('customFolders', JSON.stringify(customFolders || []));
+}
+
+function folderSidebarHtml() {
+  const folders = allFolders();
   const active = watchlistFilters.folder || '';
-  const chips = folders.map(f => `<span class="filter-chip ${active === f ? 'on' : ''}" onclick="setWatchlistFolder('${escapeHtml(f).replace(/'/g, "\\'")}')">${escapeHtml(f)}</span>`).join('');
-  return `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-    <button type="button" onclick="createFolder()">+ Folder</button>
-    ${active ? `<button type="button" onclick="setWatchlistFolder('')">All</button>` : ''}
-    ${chips}
-  </div>`;
+  const items = folders.map(f => {
+    const count = movies.filter(m => m.status === 'watchlist' && m.folder === f).length;
+    const on = active === f ? ' on' : '';
+    const safe = escapeHtml(f).replace(/'/g, "\\'");
+    return `<button type="button" class="folder-item${on}" onclick="setWatchlistFolder('${safe}')">${escapeHtml(f)} <span class="folder-count">${count}</span></button>`;
+  }).join('');
+  return `<aside class="folder-side">
+    <div class="folder-head">Folders</div>
+    <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setWatchlistFolder('')">All</button>
+    ${items}
+    <button type="button" class="folder-add" onclick="createFolder()">+ New folder</button>
+  </aside>`;
 }
 
 function createFolder() {
   const name = prompt('Folder name (e.g. friend\'s name):');
   if (!name || !name.trim()) return;
-  watchlistFilters.folder = name.trim();
+  const clean = name.trim();
+  if (!customFolders.includes(clean)) customFolders.push(clean);
+  saveFolders();
+  watchlistFilters.folder = clean;
   renderList('watchlist', m => m.status === 'watchlist');
 }
 
@@ -229,14 +248,16 @@ function setWatchlistFolder(name) {
 function assignFolder(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
-  const folders = [...new Set(movies.filter(x => x.folder).map(x => x.folder))].sort();
-  const name = prompt('Assign to folder:\n' + (folders.length ? folders.join(', ') : 'none yet') + '\n\nType a name:');
+  const folders = allFolders();
+  const name = prompt('Assign to folder:\n' + (folders.length ? folders.join(', ') : 'none yet') + '\n\nType a name, or leave blank to clear:');
   if (name === null) return;
-  m.folder = name.trim() || '';
+  const clean = name.trim();
+  m.folder = clean;
+  if (clean && !customFolders.includes(clean)) customFolders.push(clean);
+  saveFolders();
   save();
   render();
 }
-
 
 function renderSearchTab() {
   const el = document.getElementById('search');
@@ -281,10 +302,23 @@ function renderList(tabId, filter) {
   
   const searchable = ['watchlist', 'watching', 'alltime'].includes(tabId);
   let html = tabHead(`<span class="tab-count">${list.length} total</span>`, tabId);
+  if (tabId === 'watchlist') {
+    html += `<div class="watch-layout">
+      ${folderSidebarHtml()}
+      <div class="watch-main">
+        <div class="tab-tools-row">
+          <input id="${tabId}Search" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('${tabId}')">
+          ${watchlistFilterBar()}
+        </div>
+        <div id="${tabId}List" class="list-container ${view}">`;
+    html += list.length ? list.map(m => renderItem(m, view)).join('') : '<div class="empty">Nothing here yet.</div>';
+    html += `</div></div></div>`;
+    el.innerHTML = html;
+    return;
+  }
   if (searchable) {
-    html += `<div style="margin-bottom:12px; display:flex; gap:6px; flex-wrap:wrap;">
-      <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; min-width:120px; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
-      ${tabId === 'watchlist' ? watchlistFilterBar() + folderBarHtml() : ''}
+    html += `<div class="tab-tools-row">
+      <input id="${tabId}Search" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('${tabId}')">
     </div><div id="${tabId}List" class="list-container ${view}">`;
   } else {
     html += `<div class="list-container ${view}">`;
@@ -300,6 +334,7 @@ function renderList(tabId, filter) {
 }
 
 let watchlistFilters = { genres: [], folder: '' };
+let customFolders = JSON.parse(localStorage.getItem('customFolders') || '[]');
 
 function addWatchlistFilter(genre) {
   if (!watchlistFilters.genres.includes(genre)) watchlistFilters.genres.push(genre);
@@ -1709,7 +1744,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.128</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.129</p>
   `;
 }
 
@@ -1729,13 +1764,38 @@ function saveApiKey() {
 }
 
 function showTab(tab) {
+  if (!tab) return;
   document.querySelectorAll('.tabs').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('#subnav button').forEach(b => b.classList.remove('active'));
-  document.getElementById(tab).classList.add('active');
-  document.querySelector(`#subnav button[data-tab="${tab}"]`).classList.add('active');
+  const panel = document.getElementById(tab);
+  const btn = document.querySelector(`#subnav button[data-tab="${tab}"]`);
+  if (panel) panel.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (tab === 'recs') renderRecommendations(recsPage);
   else if (tab === 'seasonal') renderSeasonal(seasonalPage);
   else if (tab === 'search') renderSearchTab();
+  else if (tab === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
+}
+
+
+function sizeTop() {
+  const top = document.querySelector('.sticky-top');
+  if (!top) return;
+  document.documentElement.style.setProperty('--top-h', top.offsetHeight + 'px');
+}
+
+async function backfillPosters() {
+  const apiKey = localStorage.getItem('tmdbKey');
+  if (!apiKey) return;
+  const missing = movies.filter(m => m.tmdbId && !m.poster).slice(0, 12);
+  for (const m of missing) {
+    try {
+      const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
+      const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}`).then(r => r.json());
+      if (det.poster_path) m.poster = det.poster_path;
+    } catch {}
+  }
+  if (missing.length) { save(); render(); }
 }
 
 function startLedger() {
