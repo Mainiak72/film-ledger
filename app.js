@@ -30,7 +30,6 @@ function setViewMode(tabId, mode) {
   else if (tabId === 'decades') renderDecades();
   else if (tabId === 'seasonal') renderSeasonal(seasonalPage);
   else if (tabId === 'recs') renderRecommendations(recsPage);
-  else if (tabId === 'free') renderFree(freePage);
   else if (tabId === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
   else if (tabId === 'watching') renderList('watching', m => m.status === 'watching');
   else if (tabId === 'least') renderLeastFavorite();
@@ -42,8 +41,6 @@ function tabHead(titleHtml, tabId, refreshKind) {
     ? `<button type="button" class="refresh-btn" onclick="renderSeasonal(seasonalPage + 1)">Refresh</button>`
     : refreshKind === 'recs'
     ? `<button type="button" class="refresh-btn" onclick="renderRecommendations(recsPage + 1)">Refresh</button>`
-    : refreshKind === 'free'
-    ? `<button type="button" class="refresh-btn" onclick="renderFree(freePage)">Refresh</button>`
     : '';
   return `<div class="tab-head"><div class="tab-title">${titleHtml}</div><div class="tab-tools">${viewToggle(tabId)}${refresh}</div></div>`;
 }
@@ -150,8 +147,7 @@ function addToTop(id, which) {
 
 function renderItem(m, view, rank) {
   const title = escapeHtml(m.title || '');
-  const gold = (m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive')) ? 'color:#d4af37; font-weight:600;' : '';
-  const titleHtml = `<span style="${gold}">${rank ? rank + '. ' : ''}${title}</span>`;
+  const titleHtml = `<span>${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
   const origin = m.origin
@@ -215,7 +211,6 @@ function render() {
   renderDecades();
   renderLeastFavorite();
   renderSeasonal(seasonalPage);
-  renderFree(freePage);
   renderRecommendations(recsPage);
   renderStats();
   renderSettings();
@@ -460,32 +455,22 @@ function showDetails(id) {
       ? `<img src="https://image.tmdb.org/t/p/w342${m.poster}" alt="" style="width:92px; height:138px; object-fit:cover; border-radius:6px; flex-shrink:0;">`
       : '<div style="width:92px; height:138px; background:#222; border-radius:6px; flex-shrink:0;"></div>';
 
-    const links = m.freeLinks || [];
-    const bestFree = links[0];
-    const otherFree = links.slice(1);
-    const isFree = m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive');
-    const titleStyle = isFree ? 'color:#d4af37;' : '';
-
     modal.innerHTML = `
       <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:380px; width:100%; padding:14px; max-height:85vh; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h3 style="font-size:1rem; ${titleStyle}">${escapeHtml(m.title)}</h3>
+          <h3 style="font-size:1rem;">${escapeHtml(m.title)}</h3>
           <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:10px;">
           ${posterBlock}
           <div style="flex:1;">
             <div style="margin-bottom:6px;">${originBadge}${trailerLink}</div>
-            <a href="${bestFree ? bestFree[1] : '#'}" target="_blank" rel="noopener" style="display:block; background:#d4af37; color:#1a1408; text-align:center; padding:8px; border-radius:8px; font-weight:700; text-decoration:none; font-size:0.85rem;">${bestFree ? 'Watch Free' : 'No free link'}</a>
           </div>
         </div>
         <p style="color:#ddd; font-size:0.85rem; line-height:1.4; margin-bottom:10px;">${escapeHtml(overview)}</p>
         <div style="font-size:0.75rem; color:#aaa; margin-bottom:10px;">
           <div>${releaseDate} · ${escapeHtml(directors)}</div>
           <div>${escapeHtml(cast)}</div>
-        </div>
-        <div style="font-size:0.7rem; color:#888; margin-bottom:10px;">
-          Also free: ${otherFree.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener" style="color:#d4af37; margin-right:8px;">${n}</a>`).join('')}
         </div>
         <div style="border-top:1px solid #2e2820; padding-top:10px;">
           <div class="item-actions" style="margin-bottom:8px;">
@@ -689,7 +674,7 @@ function renderDecades() {
           </div>
           ${m.poster ? `<img src="https://image.tmdb.org/t/p/w92${m.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
           <div style="flex:1; cursor:pointer;" onclick="showDetails('${m.id}')">
-            <div class="title" style="${(m.freeLinks && m.freeLinks.some(s => s[0] === 'Internet Archive')) ? 'color:#d4af37; font-weight:600;' : ''}">${escapeHtml(m.title)}</div>
+            <div class="title" >${escapeHtml(m.title)}</div>
             <div class="meta">${m.year || ''}</div>
           </div>
           <span class="rating">${m.rating}%</span>
@@ -727,151 +712,6 @@ function moveDecade(id, decade, direction) {
 
 let seasonalPage = 1;
 let recsPage = 1;
-let freePage = 1;
-
-async function findFreeSources(title, runtimeMin) {
-  const sources = [];
-  const q = encodeURIComponent(title);
-  try {
-    const r = await fetch(`https://archive.org/advancedsearch.php?q=title:"${q}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser+AND+-title:clip&fl=identifier,runtime,title&output=json&rows=10&sort[]=downloads+desc`);
-    const data = await r.json();
-    for (const doc of (data.response?.docs || [])) {
-      const id = doc.identifier;
-      if (!id) continue;
-      const docTitle = (Array.isArray(doc.title) ? doc.title[0] : doc.title || '').toLowerCase();
-      if (!docTitle.includes(title.toLowerCase().slice(0, Math.min(8, title.length)))) continue;
-      if (docTitle.includes('trailer') || docTitle.includes('teaser') || docTitle.includes('clip')) continue;
-      let mins = 0;
-      if (doc.runtime) {
-        const parts = String(doc.runtime).match(/\d+/g);
-        if (parts && parts.length >= 3) mins = +parts[0] * 60 + +parts[1];
-        else if (parts && parts.length === 2) mins = +parts[0];
-        else if (parts) mins = +parts[0];
-      }
-      if (!mins) {
-        try {
-          const meta = await fetch(`https://archive.org/metadata/${id}`).then(r => r.json());
-          const file = (meta.files || []).find(f => /\.(mp4|mkv|avi|mov)$/i.test(f.name) && !/trailer|teaser|clip|preview/i.test(f.name));
-          if (file && file.length) mins = Math.round(+file.length / 60);
-        } catch {}
-      }
-      if (!mins) continue;
-      if (runtimeMin && Math.abs(mins - runtimeMin) > 15) continue;
-      sources.push(['Internet Archive', `https://archive.org/embed/${id}`]);
-      break;
-    }
-  } catch {}
-  return sources;
-}
-
-async function renderFree(page = 1) {
-  freePage = page;
-  const el = document.getElementById('free');
-  const apiKey = localStorage.getItem('tmdbKey');
-  if (!apiKey) { el.innerHTML = freeFilterBar() + '<div class="empty">Add your TMDB API key in Settings to load free titles.</div>'; return; }
-  el.innerHTML = freeFilterBar() + '<div class="empty">Finding theatrical movies with free copies...</div>';
-  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  let url = `https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false&with_release_type=2|3`;
-  if (!freeFilters.decades.length) url += '&primary_release_date.gte=1920-01-01&primary_release_date.lte=1980-12-31';
-  if (freeFilters.genres.length) url += '&with_genres=' + freeFilters.genres.map(g => GENRES[g]).join('|');
-  if (freeFilters.decades.length) {
-    const fetches = freeFilters.decades.map(d => {
-      const dateParam = `&primary_release_date.gte=${d}-01-01&primary_release_date.lte=${d+9}-12-31`;
-      return fetch(url + dateParam).then(r => r.json()).then(data => data.results || []).catch(() => []);
-    });
-    const all = await Promise.all(fetches);
-    const seen = new Set();
-    const results = [];
-    all.flat().forEach(m => { if (!seen.has(m.id)) { seen.add(m.id); results.push(m); } });
-    await showVerifiedFree(el, results.slice(0, 20), endpoint, apiKey, page);
-    return;
-  }
-  const data = await fetch(url).then(r => r.json()).catch(() => ({ results: [] }));
-  await showVerifiedFree(el, (data.results || []).slice(0, 20), endpoint, apiKey, page);
-}
-
-async function showVerifiedFree(el, results, endpoint, apiKey, page) {
-  if (!results.length) { el.innerHTML = freeFilterBar() + '<div class="empty">No theatrical movies found.</div>'; return; }
-  el.innerHTML = freeFilterBar() + `<div class="empty">Checking ${results.length} titles for free copies...</div>`;
-  const verified = [];
-  await Promise.all(results.map(async (m) => {
-    const title = endpoint === 'tv' ? m.name : m.title;
-    try {
-      const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}`).then(r => r.json());
-      const runtime = det.runtime || 0;
-      if (!runtime) return;
-      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title,runtime,subject&output=json&rows=8`).then(r => r.json());
-      for (const d of (ia.response?.docs || [])) {
-        const dt = (Array.isArray(d.title) ? d.title[0] : d.title || '').toLowerCase().trim();
-        const q = title.toLowerCase().trim();
-        if (dt !== q && !dt.startsWith(q + ' ') && !dt.includes(' ' + q) && !q.includes(dt.slice(0, Math.min(12, dt.length)))) continue;
-        const subjects = Array.isArray(d.subject) ? d.subject.join(' ').toLowerCase() : String(d.subject || '').toLowerCase();
-        if (subjects && !/(movie|film|feature|cinema|drama)/.test(subjects) && !dt.includes(q)) continue;
-        let mins = 0;
-        if (d.runtime) {
-          const parts = String(d.runtime).match(/\d+/g);
-          if (parts && parts.length >= 3) mins = +parts[0] * 60 + +parts[1];
-          else if (parts && parts.length === 2) mins = +parts[0];
-          else if (parts) mins = +parts[0];
-        }
-        if (!mins) {
-          try {
-            const meta = await fetch(`https://archive.org/metadata/${d.identifier}`).then(r => r.json());
-            const file = (meta.files || []).find(f => /\.(mp4|mkv|avi|mov)$/i.test(f.name) && !/trailer|teaser|clip|preview/i.test(f.name));
-            if (file && file.length) mins = Math.round(+file.length / 60);
-          } catch {}
-        }
-        if (mins && Math.abs(mins - runtime) <= 15) {
-          verified.push({ m, title, iaId: d.identifier });
-          break;
-        }
-      }
-    } catch {}
-  }));
-  if (!verified.length) {
-    el.innerHTML = freeFilterBar() + `<div class="empty">No free theatrical movies on this page.</div><div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : ''}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-    return;
-  }
-  const view = getViewMode('free');
-  const pager = `<div class="page-bar">${page > 1 ? `<button type="button" onclick="renderFree(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="renderFree(${page + 1})">Next</button></div>`;
-  el.innerHTML = freeFilterBar() + tabHead('<h3>Free to Watch</h3>', 'free', 'free') + pager + `<div class="list-container ${view}">` + verified.map(({ m, title, iaId }) => {
-    const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-    const link = `https://archive.org/embed/${iaId}`;
-    const poster = m.poster_path ? `https://image.tmdb.org/t/p/w342${m.poster_path}` : `https://archive.org/services/img/${iaId}`;
-    const existing = movies.find(x => x.tmdbId === m.id);
-    const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-    const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${m.poster_path || ''}', 'streaming', true)">Add</button>`;
-    const watchBtn = `<a href="${link}" target="_blank" rel="noopener" class="ia-watch">Watch</a>`;
-    const gold = 'color:#d4af37; font-weight:600;';
-    const overview = (m.overview || '').slice(0, 140);
-    const desc = overview ? `<div class="poster-desc">${escapeHtml(overview)}${overview.length >= 140 ? '…' : ''}</div>` : '';
-    const posterImg = `<img src="${poster}" alt="" class="poster" onerror="this.style.display='none'">`;
-    const smallPoster = `<img src="${poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;" onerror="this.style.display='none'">`;
-    if (view === 'bullet') return `<div class="bullet-item"><span class="bullet-title" style="${gold}">${escapeHtml(title)}${statusLabel}</span><span class="bullet-actions">${watchBtn}${addBtn}</span></div>`;
-    if (view === 'large') return `<div class="poster-card"><div style="cursor:pointer;">${posterImg}<div class="poster-title" style="${gold}">${escapeHtml(title)}</div><div class="poster-meta">${year}</div>${desc}</div><div class="poster-actions">${watchBtn}${addBtn}</div></div>`;
-    return `<div class="card" style="padding:8px;"><div style="display:flex; align-items:center;">${smallPoster}<div style="flex:1;"><div class="title" style="${gold}">${escapeHtml(title)}${statusLabel}</div><div class="meta">${year}</div>${overview ? `<div style="font-size:0.75rem; color:#aaa; margin-top:2px;">${escapeHtml(overview)}</div>` : ''}</div><div>${watchBtn}${addBtn}</div></div></div>`;
-  }).join('') + '</div>' + pager;
-}
-
-function addFreeFromIA(title, year, iaId) {
-  const id = 'ia-' + iaId;
-  if (movies.find(m => m.id === id)) { showToast('Already in library'); return; }
-  movies.push({
-    id,
-    title,
-    year: year ? +year : null,
-    status: 'watchlist',
-    mediaType: 'movie',
-    free: true,
-    freeLinks: [['Internet Archive', `https://archive.org/embed/${iaId}`]],
-    added: Date.now()
-  });
-  save();
-  showToast('Added to watchlist');
-  render();
-}
-
-
 function renderSeasonal(page = 1) {
   seasonalPage = page;
   const el = document.getElementById('seasonal');
@@ -940,37 +780,6 @@ function renderRecommendations(page = 1) {
     }).join('') + '</div>';
   });
 }
-
-let freeFilters = { decades: [], genres: [] };
-const GENRES = { action: 28, adventure: 12, animation: 16, comedy: 35, crime: 80, documentary: 99, drama: 18, family: 10751, fantasy: 14, horror: 27, mystery: 9648, romance: 10749, 'sci-fi': 878, thriller: 53, war: 10752, western: 37 };
-const DECADES = [2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950, 1940];
-
-function addFreeFilter(type, value) {
-  if (!freeFilters[type].includes(value)) freeFilters[type].push(value);
-  renderFree(1);
-}
-function removeFreeFilter(type, value) {
-  freeFilters[type] = freeFilters[type].filter(v => v !== value);
-  renderFree(1);
-}
-function freeFilterBar() {
-  const active = [...freeFilters.decades.map(d => `<span class="filter-chip" onclick="removeFreeFilter('decades', ${d})">${d}s ×</span>`),
-    ...freeFilters.genres.map(g => `<span class="filter-chip" onclick="removeFreeFilter('genres', '${g}')">${g} ×</span>`)].join('');
-  return `<div class="free-filters">
-    <button type="button" onclick="document.getElementById('freeAdd').classList.toggle('hide')">+ Filter</button>
-    <div id="freeAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-      <select onchange="if(this.value){addFreeFilter('decades', +this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
-        <option value="">Decade</option>${DECADES.map(d => `<option value="${d}">${d}s</option>`).join('')}
-      </select>
-      <select onchange="if(this.value){addFreeFilter('genres', this.value); this.value='';}" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:4px; border-radius:6px;">
-        <option value="">Genre</option>${Object.keys(GENRES).map(g => `<option value="${g}">${g}</option>`).join('')}
-      </select>
-    </div>
-    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
-  </div>`;
-}
-
-let suggestTimer = null;
 
 function onSearchInput() {
   clearTimeout(suggestTimer);
@@ -1605,7 +1414,6 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
     poster: posterPath || '',
     origin: origin || '',
     status: 'watchlist',
-    free: !!isFree,
     rating: null,
     added: new Date().toISOString()
   });
@@ -1816,7 +1624,6 @@ const ALL_TABS = [
   ['stats', 'Stats'],
   ['recs', 'Recommended'],
   ['seasonal', 'Seasonal'],
-  ['free', 'Free']
 ];
 
 function visibleTabs() {
@@ -1876,7 +1683,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.121</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.122</p>
   `;
 }
 
@@ -1899,8 +1706,7 @@ function showTab(tab) {
   document.querySelectorAll('#subnav button').forEach(b => b.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
   document.querySelector(`#subnav button[data-tab="${tab}"]`).classList.add('active');
-  if (tab === 'free') renderFree(freePage);
-  else if (tab === 'recs') renderRecommendations(recsPage);
+  if (tab === 'recs') renderRecommendations(recsPage);
   else if (tab === 'seasonal') renderSeasonal(seasonalPage);
 }
 
@@ -1967,7 +1773,6 @@ function startLedger() {
     window.__filmLedgerBooted = true;
     setTimeout(backfillPosters, 500);
     setTimeout(() => renderRecommendations(1), 800);
-    setTimeout(backfillFree, 1200);
   }
   render();
   applyTabVisibility();
