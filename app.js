@@ -938,8 +938,9 @@ function searchMovies(page = 1) {
 
   const resultsEl = document.getElementById('searchResults');
   if (!resultsEl) { alert('Search results area missing.'); return; }
-  resultsEl.innerHTML = '<div class="empty">Searching...</div>';
+  resultsEl.innerHTML = '<div class="empty">Searching for "' + escapeHtml(query) + '"...</div>';
   resultsEl.style.display = 'block';
+  resultsEl.style.minHeight = '60px';
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const yearMatch = query.match(/^(19|20)\d{2}$/);
@@ -1178,7 +1179,7 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
       }
       resultsEl.innerHTML = html + '<button type="button" onclick="clearSearch()" style="margin-top:8px;">Done</button>';
     })
-    .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed. Check your TMDB key.</div>');
+    .catch(err => resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(String(err)) + '</div>');
 }
 
 function titleVariants(query) {
@@ -1687,7 +1688,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.126</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.127</p>
   `;
 }
 
