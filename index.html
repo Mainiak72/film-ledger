@@ -15,7 +15,7 @@
   <div class="sticky-top">
     <div class="brand">
       <img class="brand-mark" src="film-ledger-title.png?v=557" alt="Film Ledger">
-      <span class="brand-ver">v5.134</span>
+      <span class="brand-ver">v5.135</span>
     </div>
 
     <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
@@ -42,7 +42,16 @@
 
   <div class="container">
     <div id="seasonal" class="tabs active"></div>
-    <div id="search" class="tabs"></div>
+    <div id="search" class="tabs">
+      <div class="search-bar" style="margin-bottom:12px;">
+        <div class="search-row">
+          <input id="searchQuery" type="text" placeholder="Search title, actor, director, year..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter') searchMovies()" style="flex:1;">
+          <button type="button" onclick="searchMovies()">Search</button>
+        </div>
+      </div>
+      <div id="suggestions" class="suggestions"></div>
+      <div id="searchResults"></div>
+    </div>
     <div id="watchlist" class="tabs"></div>
     <div id="watching" class="tabs"></div>
     <div id="alltime" class="tabs"></div>
@@ -54,6 +63,6 @@
     <div id="least" class="tabs"></div>
   </div>
 
-  <script src="app.js?v=5134"></script>
+  <script src="app.js?v=5135"></script>
 </body>
 </html>

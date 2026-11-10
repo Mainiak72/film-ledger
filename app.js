@@ -289,6 +289,7 @@ function removeFromFolder(id) {
 function renderSearchTab() {
   const el = document.getElementById('search');
   if (!el) return;
+  if (document.getElementById('searchQuery')) return;
   const apiKey = localStorage.getItem('tmdbKey') || '';
   el.innerHTML = `
     <div class="search-bar" style="margin-bottom:12px;">
@@ -986,8 +987,10 @@ function pickSuggestion(i) {
 
 function searchMovies(page = 1) {
   clearTimeout(suggestTimer);
-  document.getElementById('suggestions').innerHTML = '';
-  const query = document.getElementById('searchQuery').value.trim();
+  const sugg = document.getElementById('suggestions');
+  if (sugg) sugg.innerHTML = '';
+  const queryEl = document.getElementById('searchQuery');
+  const query = queryEl ? queryEl.value.trim() : '';
   const apiKey = localStorage.getItem('tmdbKey') || '';
   if (!query) {
     showRecentSearches();
@@ -1010,14 +1013,6 @@ function searchMovies(page = 1) {
   const resultsEl = document.getElementById('searchResults');
   if (!resultsEl) { alert('Search results area missing.'); return; }
   resultsEl.innerHTML = '<div class="empty">Searching for "' + escapeHtml(query) + '"...</div>';
-  resultsEl.style.display = 'block';
-  resultsEl.style.minHeight = '60px';
-  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  if (location.protocol === 'file:') {
-    resultsEl.innerHTML = '<div class="empty">Search needs a web server. Open this folder with a local server, or use the GitHub site. file:// blocks the movie API.</div>';
-    return;
-  }
   doTitleSearch(query, page, apiKey, resultsEl);
 }
 
@@ -1738,7 +1733,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.134</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.135</p>
   `;
 }
 
