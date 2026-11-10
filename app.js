@@ -50,7 +50,7 @@ function libraryButtons(m, rank) {
   const rate = rank ? '' : `<button onclick="editRating('${m.id}')">${m.rating != null ? 'Re-rate' : 'Rate'}</button>`;
   if (m.status === 'watched') {
     const fav = `<button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>`;
-    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}<button onclick="assignFolder('${m.id}')">Folder</button>${del}`;
+    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${del}`;
   }
   return `<button onclick="showDetails('${m.id}')">Details</button>`
     + (m.status !== 'watchlist' ? `<button onclick="setStatus('${m.id}', 'watchlist')">Watchlist</button>` : '')
@@ -314,7 +314,6 @@ function render() {
   renderRecommendations(recsPage);
   renderStats();
   renderSettings();
-  renderSearchTab();
 }
 
 function renderList(tabId, filter) {
@@ -631,9 +630,6 @@ function renderAllTime() {
   refreshTopSets();
   const el = document.getElementById('alltime');
   let list = filtered().filter(m => m.status === 'watched');
-  if (watchlistFilters.scope === 'watched' && watchlistFilters.folder) {
-    list = list.filter(m => (m.folder || '') === watchlistFilters.folder);
-  }
   const rated = list.filter(m => m.rating != null);
   const avg = rated.length ? Math.round(rated.reduce((s, m) => s + m.rating, 0) / rated.length) : null;
   const favs = list.filter(m => m.favorite).length;
@@ -643,31 +639,27 @@ function renderAllTime() {
   if (sortBy === 'title') list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   else if (sortBy === 'year') list.sort((a, b) => (b.year || 0) - (a.year || 0));
   else if (sortBy === 'worst') list.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+  else if (sortBy === 'favorites') list = list.filter(m => m.favorite).sort((a, b) => (b.rating || 0) - (a.rating || 0));
   else list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
   let html = tabHead(`<span class="tab-count">${list.length} watched${avg != null ? ' · avg ' + avg + '%' : ''}${favs ? ' · ' + favs + ' favorites' : ''}</span>`, 'alltime');
-  html += `<div class="watch-layout">
-    ${folderSidebarHtml('watched')}
-    <div class="watch-main">
-      <div class="tab-tools-row">
-        <input id="alltimeSearch" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('alltime')">
-        <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
-          <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
-          <option value="worst" ${sortBy==='worst'?'selected':''}>Worst Rated</option>
-          <option value="title" ${sortBy==='title'?'selected':''}>Title</option>
-          <option value="year" ${sortBy==='year'?'selected':''}>Year</option>
-        </select>
-        <button onclick="toggleFavoriteFilter()" style="font-size:0.75rem; padding:8px 12px;">${window.showFavoritesOnly ? 'Show All' : 'Favorites Only'}</button>
-      </div>
-      <div id="alltimeList" class="list-container ${view}">`;
+  html += `<div class="tab-tools-row">
+    <input id="alltimeSearch" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('alltime')">
+    <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
+      <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
+      <option value="worst" ${sortBy==='worst'?'selected':''}>Least Rated</option>
+      <option value="title" ${sortBy==='title'?'selected':''}>Title</option>
+      <option value="year" ${sortBy==='year'?'selected':''}>Year</option>
+      <option value="favorites" ${sortBy==='favorites'?'selected':''}>Favorites Only</option>
+    </select>
+  </div><div id="alltimeList" class="list-container ${view}">`;
 
-  const displayList = window.showFavoritesOnly ? list.filter(m => m.favorite) : list;
-  if (displayList.length === 0) {
-    html += '<div class="empty">' + (window.showFavoritesOnly ? 'No favorites yet.' : 'Nothing here yet.') + '</div>';
+  if (list.length === 0) {
+    html += '<div class="empty">' + (sortBy === 'favorites' ? 'No favorites yet.' : 'Nothing here yet.') + '</div>';
   } else {
-    html += displayList.map(m => renderItem(m, view)).join('');
+    html += list.map(m => renderItem(m, view)).join('');
   }
-  html += '</div></div></div>';
+  html += '</div>';
   el.innerHTML = html;
 }
 
@@ -1225,9 +1217,14 @@ function clearSearch() {
 
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
-    .then(r => r.json())
-    .then(data => {
+  fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok || data.status_code) {
+        const msg = data.status_message || 'TMDB rejected the key';
+        resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(msg) + '. Check the API key in Settings.</div>';
+        return;
+      }
       const hits = data.results || [];
       if (!hits.length) {
         resultsEl.innerHTML = '<div class="empty">No results for "' + escapeHtml(query) + '".</div>';
@@ -1777,7 +1774,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.130</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.131</p>
   `;
 }
 

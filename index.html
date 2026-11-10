@@ -15,18 +15,10 @@
   <div class="sticky-top">
     <div class="brand">
       <img class="brand-mark" src="film-ledger-title.png?v=557" alt="Film Ledger">
-      <span class="brand-ver">v5.130</span>
+      <span class="brand-ver">v5.131</span>
     </div>
 
-    <div class="search-bar" style="display:none;">
-      <div class="search-row">
-        <input id="searchQuery" type="text" placeholder="Search title, actor, director, year..." oninput="onSearchInput()" onkeydown="if(event.key==='Enter') searchMovies()">
-        <button type="button" onclick="searchMovies()">Search</button>
-      </div>
-    </div>
-    <div id="suggestions" class="suggestions" style="display:none;"></div>
     <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
-    <div id="searchResults" style="display:none;"></div>
 
     <div class="mode-switch">
       <button type="button" id="btnMovies" class="mode-btn active" onclick="setMode('movie')">Movies</button>
@@ -62,6 +54,6 @@
     <div id="least" class="tabs"></div>
   </div>
 
-  <script src="app.js?v=5130"></script>
+  <script src="app.js?v=5131"></script>
 </body>
 </html>
