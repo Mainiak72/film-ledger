@@ -298,7 +298,7 @@ function renderSearchTab() {
     </div>
     <div id="suggestions" class="suggestions"></div>
     <div id="searchResults"></div>
-    ${apiKey ? '' : '<div class="empty">Add your TMDB API key in Settings to search.</div>'}
+    ${apiKey ? '<div class="empty" style="margin-top:8px;">Key saved. Type a title and hit Search.</div>' : '<div class="empty">Add your TMDB API key in Settings to search.</div>'}
   `;
 }
 
@@ -1724,13 +1724,14 @@ function visibleTabs() {
 
 function applyTabVisibility() {
   const on = visibleTabs();
+  on.add('search');
   document.querySelectorAll('#subnav button').forEach(btn => {
     const tab = btn.dataset.tab;
-    if (tab === 'settings') return;
+    if (tab === 'settings' || tab === 'search') return;
     btn.classList.toggle('tab-hidden', !on.has(tab));
   });
   const active = document.querySelector('#subnav button.active');
-  if (active && active.classList.contains('tab-hidden')) showTab('settings');
+  if (active && active.classList.contains('tab-hidden')) showTab('search');
 }
 
 function toggleTabVisibility(tab) {
@@ -1774,7 +1775,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.131</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.132</p>
   `;
 }
 
