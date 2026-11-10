@@ -498,6 +498,19 @@ nav button.active {
   justify-content: center;
 }
 
+.folder-move, .folder-del {
+  color: var(--accent);
+  font-size: 0.75rem;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.folder-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .watch-main { min-width: 0; }
 
 .tab-tools-row {

@@ -204,37 +204,50 @@ function renderItem(m, view, rank) {
 
 function allFolders() {
   const fromMovies = movies.filter(m => m.folder).map(m => m.folder);
-  return [...new Set([...(customFolders || []), ...fromMovies])].filter(Boolean).sort();
+  const known = [...new Set([...(customFolders || []), ...fromMovies])].filter(Boolean);
+  const ordered = (customFolders || []).filter(f => known.includes(f));
+  const extra = known.filter(f => !ordered.includes(f));
+  return [...ordered, ...extra];
 }
 
 function saveFolders() {
   localStorage.setItem('customFolders', JSON.stringify(customFolders || []));
 }
 
-function folderScope() {
-  return watchlistFilters.scope || 'watchlist';
-}
-
 function folderSidebarHtml(scope) {
   const folders = allFolders();
   const active = (watchlistFilters.folder && watchlistFilters.scope === scope) ? watchlistFilters.folder : '';
-  const items = folders.map(f => {
+  const items = folders.map((f, i) => {
     const count = movies.filter(m => m.status === scope && m.folder === f).length;
     const on = active === f ? ' on' : '';
     const safe = escapeHtml(f).replace(/'/g, "\\'");
     const del = count === 0 ? `<span class="folder-del" onclick="event.stopPropagation(); deleteFolder('${safe}')" title="Delete empty folder">×</span>` : '';
-    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${del}</button>`;
+    const up = i > 0 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, -1)">▲</span>` : '';
+    const down = i < folders.length - 1 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, 1)">▼</span>` : '';
+    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${up}${down}${del}</button>`;
   }).join('');
   return `<aside class="folder-side">
     <div class="folder-head">Folders</div>
     <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setFolder('', '${scope}')">All</button>
     ${items}
-    <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ New folder</button>
+    <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ Folder</button>
   </aside>`;
 }
 
+function moveFolder(index, dir) {
+  const folders = allFolders();
+  const next = index + dir;
+  if (next < 0 || next >= folders.length) return;
+  const copy = folders.slice();
+  const [item] = copy.splice(index, 1);
+  copy.splice(next, 0, item);
+  customFolders = copy;
+  saveFolders();
+  render();
+}
+
 function createFolder(scope) {
-  const name = prompt('Folder name (e.g. friend\'s name):');
+  const name = prompt('Folder name:');
   if (!name || !name.trim()) return;
   const clean = name.trim();
   if (!customFolders.includes(clean)) customFolders.push(clean);
@@ -263,20 +276,52 @@ function deleteFolder(name) {
 function assignFolder(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
   const folders = allFolders();
-  const existing = folders.map((f, i) => (i + 1) + '. ' + f).join('\n');
-  const hint = folders.length ? existing + '\n\nType a number, an existing name, a new name, or blank to remove:' : 'Type a folder name, or blank to remove:';
-  const name = prompt(hint);
-  if (name === null) return;
-  const typed = name.trim();
-  let clean = typed;
-  const num = parseInt(typed, 10);
-  if (typed && !isNaN(num) && num >= 1 && num <= folders.length) clean = folders[num - 1];
-  m.folder = clean;
-  if (clean && !customFolders.includes(clean)) customFolders.push(clean);
+  const options = folders.map(f => {
+    const safe = escapeHtml(f).replace(/'/g, "\\'");
+    const on = m.folder === f ? ' on' : '';
+    return `<button type="button" class="folder-item${on}" onclick="setMovieFolder('${m.id}', '${safe}')">${escapeHtml(f)}</button>`;
+  }).join('');
+  const none = `<button type="button" class="folder-item${m.folder ? '' : ' on'}" onclick="setMovieFolder('${m.id}', '')">None</button>`;
+  const modal = document.createElement('div');
+  modal.className = 'sheet';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:360px; width:100%; padding:18px; max-height:80vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1.05rem; color:#d4af37;">Folder</h3>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
+      </div>
+      <div class="folder-pick">
+        ${none}
+        ${options}
+        <button type="button" class="folder-add" onclick="createFolderAndAssign('${m.id}')">+ Folder</button>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function setMovieFolder(id, name) {
+  const m = movies.find(x => x.id === id);
+  if (!m) return;
+  m.folder = name || '';
+  if (name && !customFolders.includes(name)) customFolders.push(name);
   saveFolders();
   save();
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
   render();
+}
+
+function createFolderAndAssign(id) {
+  const name = prompt('Folder name:');
+  if (!name || !name.trim()) return;
+  const clean = name.trim();
+  if (!customFolders.includes(clean)) customFolders.push(clean);
+  saveFolders();
+  setMovieFolder(id, clean);
 }
 
 function removeFromFolder(id) {
@@ -1772,7 +1817,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.138</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.139</p>
   `;
 }
 
