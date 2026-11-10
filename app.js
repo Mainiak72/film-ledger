@@ -50,7 +50,7 @@ function libraryButtons(m, rank) {
   const rate = rank ? '' : `<button onclick="editRating('${m.id}')">${m.rating != null ? 'Re-rate' : 'Rate'}</button>`;
   if (m.status === 'watched') {
     const fav = `<button onclick="toggleFavorite('${m.id}')">${m.favorite ? 'Unfav' : 'Fav'}</button>`;
-    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}${del}`;
+    return `<button onclick="showDetails('${m.id}')">Details</button>${rate}${fav}<button onclick="assignFolder('${m.id}')">Folder</button>${del}`;
   }
   return `<button onclick="showDetails('${m.id}')">Details</button>`
     + (m.status !== 'watchlist' ? `<button onclick="setStatus('${m.id}', 'watchlist')">Watchlist</button>` : '')
@@ -151,11 +151,7 @@ function renderItem(m, view, rank) {
   const titleHtml = `<span>${rank ? rank + '. ' : ''}${title}</span>`;
   const year = m.year || '';
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
-  const origin = m.origin
-    ? (m.origin === 'theatrical'
-        ? '<span class="origin-badge theatrical">Theatrical</span>'
-        : '<span class="origin-badge streaming">Streaming</span>')
-    : '';
+  const folderLabel = m.folder ? `<span class="folder-tag">${escapeHtml(m.folder)}</span>` : '';
   const posterUrl = m.poster ? `https://image.tmdb.org/t/p/w342${m.poster}` : '';
   const posterImg = posterUrl
     ? `<img src="${posterUrl}" alt="" class="poster">`
@@ -177,7 +173,7 @@ function renderItem(m, view, rank) {
         ${rank ? `<div class="poster-rank ${isFirst ? 'gold' : ''}">${rank}</div>` : ''}
         ${posterImg}
         <div class="poster-title">${titleHtml}</div>
-        <div class="poster-meta">${year} ${rating}</div>
+        <div class="poster-meta">${year} ${rating} ${folderLabel}</div>
         ${shortDesc ? `<div class="poster-desc">${escapeHtml(shortDesc)}${shortDesc.length >= 80 ? '…' : ''}</div>` : ''}
       </div>
       <div class="poster-actions" onclick="event.stopPropagation()">${libraryButtons(m, rank)}</div>
@@ -194,7 +190,7 @@ function renderItem(m, view, rank) {
         ${smallPoster}
         <div class="movie-info">
           <div class="title">${titleHtml}${origin}</div>
-          <div class="meta">${year} ${m.genre ? '· ' + m.genre : ''}</div>
+          <div class="meta">${year} ${m.genre ? '· ' + m.genre : ''} ${folderLabel}</div>
         </div>
         ${rating}
       </div>
@@ -213,48 +209,78 @@ function saveFolders() {
   localStorage.setItem('customFolders', JSON.stringify(customFolders || []));
 }
 
-function folderSidebarHtml() {
+function folderScope() {
+  return watchlistFilters.scope || 'watchlist';
+}
+
+function folderSidebarHtml(scope) {
   const folders = allFolders();
-  const active = watchlistFilters.folder || '';
+  const active = (watchlistFilters.folder && watchlistFilters.scope === scope) ? watchlistFilters.folder : '';
   const items = folders.map(f => {
-    const count = movies.filter(m => m.status === 'watchlist' && m.folder === f).length;
+    const count = movies.filter(m => m.status === scope && m.folder === f).length;
     const on = active === f ? ' on' : '';
     const safe = escapeHtml(f).replace(/'/g, "\\'");
-    return `<button type="button" class="folder-item${on}" onclick="setWatchlistFolder('${safe}')">${escapeHtml(f)} <span class="folder-count">${count}</span></button>`;
+    const del = count === 0 ? `<span class="folder-del" onclick="event.stopPropagation(); deleteFolder('${safe}')" title="Delete empty folder">×</span>` : '';
+    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${del}</button>`;
   }).join('');
   return `<aside class="folder-side">
     <div class="folder-head">Folders</div>
-    <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setWatchlistFolder('')">All</button>
+    <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setFolder('', '${scope}')">All</button>
     ${items}
-    <button type="button" class="folder-add" onclick="createFolder()">+ New folder</button>
+    <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ New folder</button>
   </aside>`;
 }
 
-function createFolder() {
+function createFolder(scope) {
   const name = prompt('Folder name (e.g. friend\'s name):');
   if (!name || !name.trim()) return;
   const clean = name.trim();
   if (!customFolders.includes(clean)) customFolders.push(clean);
   saveFolders();
-  watchlistFilters.folder = clean;
-  renderList('watchlist', m => m.status === 'watchlist');
+  setFolder(clean, scope || 'watchlist');
 }
 
-function setWatchlistFolder(name) {
+function setFolder(name, scope) {
   watchlistFilters.folder = name || '';
-  renderList('watchlist', m => m.status === 'watchlist');
+  watchlistFilters.scope = scope || 'watchlist';
+  if (scope === 'watched') renderAllTime();
+  else renderList(scope || 'watchlist', m => m.status === (scope || 'watchlist'));
+}
+
+function deleteFolder(name) {
+  if (!name) return;
+  const used = movies.some(m => m.folder === name);
+  if (used) { alert('Folder still has movies. Remove them first.'); return; }
+  if (!confirm('Delete folder "' + name + '"?')) return;
+  customFolders = customFolders.filter(f => f !== name);
+  saveFolders();
+  if (watchlistFilters.folder === name) watchlistFilters.folder = '';
+  render();
 }
 
 function assignFolder(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
   const folders = allFolders();
-  const name = prompt('Assign to folder:\n' + (folders.length ? folders.join(', ') : 'none yet') + '\n\nType a name, or leave blank to clear:');
+  const existing = folders.map((f, i) => (i + 1) + '. ' + f).join('\n');
+  const hint = folders.length ? existing + '\n\nType a number, an existing name, a new name, or blank to remove:' : 'Type a folder name, or blank to remove:';
+  const name = prompt(hint);
   if (name === null) return;
-  const clean = name.trim();
+  const typed = name.trim();
+  let clean = typed;
+  const num = parseInt(typed, 10);
+  if (typed && !isNaN(num) && num >= 1 && num <= folders.length) clean = folders[num - 1];
   m.folder = clean;
   if (clean && !customFolders.includes(clean)) customFolders.push(clean);
   saveFolders();
+  save();
+  render();
+}
+
+function removeFromFolder(id) {
+  const m = movies.find(x => x.id === id);
+  if (!m) return;
+  m.folder = '';
   save();
   render();
 }
@@ -304,7 +330,7 @@ function renderList(tabId, filter) {
   let html = tabHead(`<span class="tab-count">${list.length} total</span>`, tabId);
   if (tabId === 'watchlist') {
     html += `<div class="watch-layout">
-      ${folderSidebarHtml()}
+      ${folderSidebarHtml('watchlist')}
       <div class="watch-main">
         <div class="tab-tools-row">
           <input id="${tabId}Search" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('${tabId}')">
@@ -605,6 +631,9 @@ function renderAllTime() {
   refreshTopSets();
   const el = document.getElementById('alltime');
   let list = filtered().filter(m => m.status === 'watched');
+  if (watchlistFilters.scope === 'watched' && watchlistFilters.folder) {
+    list = list.filter(m => (m.folder || '') === watchlistFilters.folder);
+  }
   const rated = list.filter(m => m.rating != null);
   const avg = rated.length ? Math.round(rated.reduce((s, m) => s + m.rating, 0) / rated.length) : null;
   const favs = list.filter(m => m.favorite).length;
@@ -617,16 +646,20 @@ function renderAllTime() {
   else list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
   let html = tabHead(`<span class="tab-count">${list.length} watched${avg != null ? ' · avg ' + avg + '%' : ''}${favs ? ' · ' + favs + ' favorites' : ''}</span>`, 'alltime');
-  html += `<div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-    <input id="alltimeSearch" placeholder="Search..." oninput="filterTab('alltime')" style="flex:1; min-width:120px; background:#222; color:white; border:1px solid #2a2a2a; padding:10px; border-radius:8px;">
-    <select id="alltimeSort" onchange="renderAllTime()" style="background:#222; color:white; border:1px solid #2a2a2a; padding:10px; border-radius:8px;">
-      <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
-      <option value="worst" ${sortBy==='worst'?'selected':''}>Worst Rated</option>
-      <option value="title" ${sortBy==='title'?'selected':''}>Title</option>
-      <option value="year" ${sortBy==='year'?'selected':''}>Year</option>
-    </select>
-    <button onclick="toggleFavoriteFilter()" style="font-size:0.75rem; padding:8px 12px;">${window.showFavoritesOnly ? 'Show All' : 'Favorites Only'}</button>
-  </div><div id="alltimeList" class="list-container ${view}">`;
+  html += `<div class="watch-layout">
+    ${folderSidebarHtml('watched')}
+    <div class="watch-main">
+      <div class="tab-tools-row">
+        <input id="alltimeSearch" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('alltime')">
+        <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
+          <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
+          <option value="worst" ${sortBy==='worst'?'selected':''}>Worst Rated</option>
+          <option value="title" ${sortBy==='title'?'selected':''}>Title</option>
+          <option value="year" ${sortBy==='year'?'selected':''}>Year</option>
+        </select>
+        <button onclick="toggleFavoriteFilter()" style="font-size:0.75rem; padding:8px 12px;">${window.showFavoritesOnly ? 'Show All' : 'Favorites Only'}</button>
+      </div>
+      <div id="alltimeList" class="list-container ${view}">`;
 
   const displayList = window.showFavoritesOnly ? list.filter(m => m.favorite) : list;
   if (displayList.length === 0) {
@@ -634,7 +667,7 @@ function renderAllTime() {
   } else {
     html += displayList.map(m => renderItem(m, view)).join('');
   }
-  html += '</div>';
+  html += '</div></div></div>';
   el.innerHTML = html;
 }
 
@@ -1744,7 +1777,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.129</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.130</p>
   `;
 }
 

@@ -421,10 +421,10 @@ nav button {
 nav button.tab-hidden { display: none; }
 
 nav button.active {
-  background: rgba(212, 175, 55, 0.12);
+  background: transparent;
   color: var(--accent);
-  border-color: var(--accent);
-  font-size: 0.82rem;
+  border-color: transparent;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
@@ -475,9 +475,14 @@ nav button.active {
   color: var(--accent);
 }
 
-.folder-count {
-  color: var(--muted);
-  font-size: 0.72rem;
+.folder-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1px 6px;
 }
 
 .folder-add {
