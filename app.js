@@ -1123,6 +1123,18 @@ function doPersonSearch(query, apiKey, resultsEl) {
     .catch(() => resultsEl.innerHTML = '<div class="empty">No results.</div>');
 }
 
+
+function pageBar(page, total) {
+  if (total <= 1) return '';
+  return `<div class="page-bar">${page > 1 ? `<button type="button" onclick="searchMovies(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="searchMovies(${page + 1})">Next</button></div>`;
+}
+
+function clearSearch() {
+  document.getElementById('searchQuery').value = '';
+  document.getElementById('suggestions').innerHTML = '';
+  document.getElementById('searchResults').innerHTML = '';
+}
+
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
@@ -1675,7 +1687,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.125</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.126</p>
   `;
 }
 
