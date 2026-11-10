@@ -220,7 +220,7 @@ function folderSidebarHtml(scope) {
   const items = folders.map((f, i) => {
     const count = movies.filter(m => m.status === scope && m.folder === f).length;
     const on = active === f ? ' on' : '';
-    const safe = escapeHtml(f).replace(/'/g, "\\'");
+    const safe = escapeHtml(f.replace(/'/g, "\\'"));
     const del = count === 0 ? `<span class="folder-del" onclick="event.stopPropagation(); deleteFolder('${safe}')" title="Delete empty folder">×</span>` : '';
     const up = i > 0 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, -1)">▲</span>` : '';
     const down = i < folders.length - 1 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, 1)">▼</span>` : '';
@@ -279,7 +279,7 @@ function assignFolder(id) {
   document.querySelectorAll('.sheet').forEach(el => el.remove());
   const folders = allFolders();
   const options = folders.map(f => {
-    const safe = escapeHtml(f).replace(/'/g, "\\'");
+    const safe = escapeHtml(f.replace(/'/g, "\\'"));
     const on = m.folder === f ? ' on' : '';
     return `<button type="button" class="folder-item${on}" onclick="setMovieFolder('${m.id}', '${safe}')">${escapeHtml(f)}</button>`;
   }).join('');
@@ -1817,7 +1817,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.139</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.140</p>
   `;
 }
 
