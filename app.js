@@ -748,8 +748,15 @@ async function findFreeSources(title, runtimeMin) {
         else if (parts && parts.length === 2) mins = +parts[0];
         else if (parts) mins = +parts[0];
       }
+      if (!mins) {
+        try {
+          const meta = await fetch(`https://archive.org/metadata/${id}`).then(r => r.json());
+          const file = (meta.files || []).find(f => /\.(mp4|mkv|avi|mov)$/i.test(f.name) && !/trailer|teaser|clip|preview/i.test(f.name));
+          if (file && file.length) mins = Math.round(+file.length / 60);
+        } catch {}
+      }
       if (!mins) continue;
-      if (runtimeMin && Math.abs(mins - runtimeMin) > 20) continue;
+      if (runtimeMin && Math.abs(mins - runtimeMin) > 15) continue;
       sources.push(['Internet Archive', `https://archive.org/embed/${id}`]);
       break;
     }
@@ -793,13 +800,13 @@ async function showVerifiedFree(el, results, endpoint, apiKey, page) {
       const det = await fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}`).then(r => r.json());
       const runtime = det.runtime || 0;
       if (!runtime) return;
-      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title,runtime,subject&output=json&rows=5`).then(r => r.json());
-      const doc = (ia.response?.docs || []).find(d => {
+      const ia = await fetch(`https://archive.org/advancedsearch.php?q=title:"${encodeURIComponent(title)}"+AND+mediatype:movies+AND+-title:trailer+AND+-title:teaser&fl=identifier,title,runtime,subject&output=json&rows=8`).then(r => r.json());
+      for (const d of (ia.response?.docs || [])) {
         const dt = (Array.isArray(d.title) ? d.title[0] : d.title || '').toLowerCase().trim();
         const q = title.toLowerCase().trim();
-        if (dt !== q && !dt.startsWith(q + ' ') && !dt.includes(' ' + q)) return false;
+        if (dt !== q && !dt.startsWith(q + ' ') && !dt.includes(' ' + q) && !q.includes(dt.slice(0, Math.min(12, dt.length)))) continue;
         const subjects = Array.isArray(d.subject) ? d.subject.join(' ').toLowerCase() : String(d.subject || '').toLowerCase();
-        if (subjects && !/(movie|film|feature|cinema)/.test(subjects)) return false;
+        if (subjects && !/(movie|film|feature|cinema|drama)/.test(subjects) && !dt.includes(q)) continue;
         let mins = 0;
         if (d.runtime) {
           const parts = String(d.runtime).match(/\d+/g);
@@ -807,9 +814,18 @@ async function showVerifiedFree(el, results, endpoint, apiKey, page) {
           else if (parts && parts.length === 2) mins = +parts[0];
           else if (parts) mins = +parts[0];
         }
-        return mins && Math.abs(mins - runtime) <= 15;
-      });
-      if (doc) verified.push({ m, title, iaId: doc.identifier });
+        if (!mins) {
+          try {
+            const meta = await fetch(`https://archive.org/metadata/${d.identifier}`).then(r => r.json());
+            const file = (meta.files || []).find(f => /\.(mp4|mkv|avi|mov)$/i.test(f.name) && !/trailer|teaser|clip|preview/i.test(f.name));
+            if (file && file.length) mins = Math.round(+file.length / 60);
+          } catch {}
+        }
+        if (mins && Math.abs(mins - runtime) <= 15) {
+          verified.push({ m, title, iaId: d.identifier });
+          break;
+        }
+      }
     } catch {}
   }));
   if (!verified.length) {
@@ -1860,7 +1876,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.120</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.121</p>
   `;
 }
 
