@@ -202,6 +202,41 @@ function renderItem(m, view, rank) {
   `;
 }
 
+
+function folderBarHtml() {
+  const folders = [...new Set(movies.filter(m => m.status === 'watchlist' && m.folder).map(m => m.folder))].sort();
+  const active = watchlistFilters.folder || '';
+  const chips = folders.map(f => `<span class="filter-chip ${active === f ? 'on' : ''}" onclick="setWatchlistFolder('${escapeHtml(f).replace(/'/g, "\\'")}')">${escapeHtml(f)}</span>`).join('');
+  return `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+    <button type="button" onclick="createFolder()">+ Folder</button>
+    ${active ? `<button type="button" onclick="setWatchlistFolder('')">All</button>` : ''}
+    ${chips}
+  </div>`;
+}
+
+function createFolder() {
+  const name = prompt('Folder name (e.g. friend\'s name):');
+  if (!name || !name.trim()) return;
+  watchlistFilters.folder = name.trim();
+  renderList('watchlist', m => m.status === 'watchlist');
+}
+
+function setWatchlistFolder(name) {
+  watchlistFilters.folder = name || '';
+  renderList('watchlist', m => m.status === 'watchlist');
+}
+
+function assignFolder(id) {
+  const m = movies.find(x => x.id === id);
+  if (!m) return;
+  const folders = [...new Set(movies.filter(x => x.folder).map(x => x.folder))].sort();
+  const name = prompt('Assign to folder:\n' + (folders.length ? folders.join(', ') : 'none yet') + '\n\nType a name:');
+  if (name === null) return;
+  m.folder = name.trim() || '';
+  save();
+  render();
+}
+
 function render() {
   refreshTopSets();
   renderList('watchlist', m => m.status === 'watchlist');
@@ -218,16 +253,19 @@ function render() {
 
 function renderList(tabId, filter) {
   const el = document.getElementById(tabId);
-  const list = filtered().filter(filter).sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  let list = filtered().filter(filter).sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  if (tabId === 'watchlist') {
+    if (watchlistFilters.genres.length) list = list.filter(m => watchlistFilters.genres.every(g => (m.genre || '').split(',').map(x => x.trim()).includes(g)));
+    if (watchlistFilters.folder) list = list.filter(m => (m.folder || '') === watchlistFilters.folder);
+  }
   const view = getViewMode(tabId);
   
   const searchable = ['watchlist', 'watching', 'alltime'].includes(tabId);
-  const genres = [...new Set(filtered().map(m => m.genre).filter(Boolean))].sort();
   let html = tabHead(`<span class="tab-count">${list.length} total</span>`, tabId);
   if (searchable) {
-    html += `<div style="margin-bottom:12px; display:flex; gap:6px;">
-      <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
-      ${tabId === 'watchlist' ? watchlistFilterBar() : ''}
+    html += `<div style="margin-bottom:12px; display:flex; gap:6px; flex-wrap:wrap;">
+      <input id="${tabId}Search" placeholder="Search..." oninput="filterTab('${tabId}')" style="flex:1; min-width:120px; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
+      ${tabId === 'watchlist' ? watchlistFilterBar() + folderBarHtml() : ''}
     </div><div id="${tabId}List" class="list-container ${view}">`;
   } else {
     html += `<div class="list-container ${view}">`;
@@ -242,7 +280,7 @@ function renderList(tabId, filter) {
   el.innerHTML = html;
 }
 
-let watchlistFilters = { genres: [] };
+let watchlistFilters = { genres: [], folder: '' };
 
 function addWatchlistFilter(genre) {
   if (!watchlistFilters.genres.includes(genre)) watchlistFilters.genres.push(genre);
@@ -1683,7 +1721,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.122</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.123</p>
   `;
 }
 
