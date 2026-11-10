@@ -325,14 +325,12 @@ function renderList(tabId, filter) {
   }
   const view = getViewMode(tabId);
   
-  const searchable = ['watchlist', 'watching', 'alltime'].includes(tabId);
   let html = tabHead(`<span class="tab-count">${list.length} total</span>`, tabId);
   if (tabId === 'watchlist') {
     html += `<div class="watch-layout">
       ${folderSidebarHtml('watchlist')}
       <div class="watch-main">
         <div class="tab-tools-row">
-          <input id="${tabId}Search" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('${tabId}')">
           ${watchlistFilterBar()}
         </div>
         <div id="${tabId}List" class="list-container ${view}">`;
@@ -341,13 +339,7 @@ function renderList(tabId, filter) {
     el.innerHTML = html;
     return;
   }
-  if (searchable) {
-    html += `<div class="tab-tools-row">
-      <input id="${tabId}Search" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('${tabId}')">
-    </div><div id="${tabId}List" class="list-container ${view}">`;
-  } else {
-    html += `<div class="list-container ${view}">`;
-  }
+  html += `<div class="list-container ${view}">`;
 
   if (list.length === 0) {
     html += '<div class="empty">Nothing here yet.</div>';
@@ -644,7 +636,6 @@ function renderAllTime() {
 
   let html = tabHead(`<span class="tab-count">${list.length} watched${avg != null ? ' · avg ' + avg + '%' : ''}${favs ? ' · ' + favs + ' favorites' : ''}</span>`, 'alltime');
   html += `<div class="tab-tools-row">
-    <input id="alltimeSearch" class="tab-search-input" placeholder="Filter this tab..." oninput="filterTab('alltime')">
     <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
       <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
       <option value="worst" ${sortBy==='worst'?'selected':''}>Least Rated</option>
@@ -1775,7 +1766,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.132</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.133</p>
   `;
 }
 
