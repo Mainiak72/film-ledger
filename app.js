@@ -1124,101 +1124,51 @@ function doPersonSearch(query, apiKey, resultsEl) {
 }
 
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
-  const personCheck = page === 1 && tried.length === 0
-    ? fetch(`https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=1`).then(r => r.json()).catch(() => ({ results: [] }))
-    : Promise.resolve({ results: [] });
-
-  Promise.all([
-    fetch(`https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`).then(r => r.json()),
-    personCheck
-  ]).then(([data, people]) => {
-    const person = bestPersonMatch(people.results, query);
-    const hits = (data.results || []).filter(m => m.media_type === 'movie' || m.media_type === 'tv');
-    const exactTitle = hits.some(m => (m.title || m.name || '').toLowerCase() === query.toLowerCase());
-    const singleWord = query.trim().split(/\s+/).length === 1;
-    if (person && (!exactTitle || singleWord)) {
-      showPersonCredits(person, apiKey, resultsEl, query);
-      return;
-    }
-    if (hits.length === 0 && page === 1) {
-      const next = titleVariants(query).find(v => !tried.includes(v) && v !== query);
-      if (next) {
-        doTitleSearch(next, 1, apiKey, resultsEl, [...tried, query]);
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
+    .then(r => r.json())
+    .then(data => {
+      const hits = data.results || [];
+      if (!hits.length) {
+        resultsEl.innerHTML = '<div class="empty">No results for "' + escapeHtml(query) + '".</div>';
         return;
       }
-      doPersonSearch(query, apiKey, resultsEl);
-      return;
-    }
-      const filtered = hits.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 8);
+      window.lastSearchResults = hits;
       const totalPages = data.total_pages || 1;
-      const note = tried.length ? `<div class="empty" style="margin-bottom:8px;">Showing results for <strong>${escapeHtml(query)}</strong></div>` : '';
-      
-      const detailFetches = filtered.map(m => {
-        const endpoint = m.media_type === 'tv' ? 'tv' : 'movie';
-        return fetch(`https://api.themoviedb.org/3/${endpoint}/${m.id}?api_key=${apiKey}&language=en-US&append_to_response=release_dates`)
-          .then(r => r.json())
-          .then(details => ({ ...m, details }))
-          .catch(() => ({ ...m, details: {} }));
-      });
-
-      Promise.all(detailFetches).then(withDetails => {
-        window.lastSearchResults = withDetails;
-        let html = withDetails.map((m, idx) => {
-          const isTV = m.media_type === 'tv';
-          const title = isTV ? m.name : m.title;
-          const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-          const poster = m.poster_path
-            ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
-            : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-          const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === m.media_type);
-          const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : '';
-          let originBadge = '';
-          const usRelease = m.details.release_dates?.results?.find(r => r.iso_3166_1 === 'US');
-          const hasTheatrical = !isTV && usRelease?.release_dates?.some(d => d.type === 3);
-          if (hasTheatrical) originBadge = '<span style="background:#d4af37; color:#000; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px; font-weight:600;">Theatrical</span>';
-          else originBadge = '<span style="background:#4b5563; color:#fff; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px;">Streaming</span>';
-          return `
-            <div class="card" style="display:flex; align-items:center; padding:8px;">
-              ${poster}
-              <div style="flex:1;">
-                <div class="title">${escapeHtml(title)} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span>${originBadge}${statusLabel}</div>
-                <div class="meta">${year}</div>
-              </div>
-              <div style="display:flex; gap:4px;">
-                <button onclick="event.stopPropagation(); showSearchDetails(${m.id}, '${m.media_type}')" style="font-size:0.7rem; padding:4px 8px;">Details</button>
-                ${existing 
-                  ? `<button onclick="removeFromLibrary(${m.id}, '${m.media_type}')" style="font-size:0.7rem; padding:4px 8px; background:#5a1a1a;">Remove</button>`
-                  : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
-                }
-              </div>
+      let html = hits.map((m, idx) => {
+        const title = endpoint === 'tv' ? m.name : m.title;
+        const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+        const poster = m.poster_path
+          ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
+          : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+        const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
+        const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+        return `
+          <div class="card" style="display:flex; align-items:center; padding:8px;">
+            ${poster}
+            <div style="flex:1;">
+              <div class="title">${escapeHtml(title)}${statusLabel}</div>
+              <div class="meta">${year}</div>
             </div>
-          `;
-        }).join('');
-        if (totalPages > 1) {
-          const bar = pageBar(page, totalPages);
-          html = bar + html + bar;
-        }
-        const done = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div>`;
-        resultsEl.innerHTML = done + note + html;
-      });
+            <div style="display:flex; gap:4px;">
+              <button onclick="showSearchDetails(${m.id}, '${endpoint}')" style="font-size:0.7rem; padding:4px 8px;">Details</button>
+              ${existing 
+                ? `<button onclick="removeFromLibrary(${m.id}, '${endpoint}')" style="font-size:0.7rem; padding:4px 8px; background:#5a1a1a;">Remove</button>`
+                : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+      if (totalPages > 1) {
+        const bar = pageBar(page, totalPages);
+        html = bar + html + bar;
+      }
+      resultsEl.innerHTML = html + '<button type="button" onclick="clearSearch()" style="margin-top:8px;">Done</button>';
     })
-    .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+    .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed. Check your TMDB key.</div>');
 }
 
-function clearResults() {
-  document.getElementById('searchResults').innerHTML = '';
-  document.getElementById('searchQuery').value = '';
-  document.getElementById('suggestions').innerHTML = '';
-}
-
-function pageBar(page, totalPages) {
-  if (totalPages <= 1) return '';
-  return `<div class="page-bar">
-    ${page > 1 ? `<button type="button" onclick="searchMovies(${page - 1})">Prev</button>` : '<span></span>'}
-    <span>Page ${page} of ${totalPages}</span>
-    ${page < totalPages ? `<button type="button" onclick="searchMovies(${page + 1})">Next</button>` : '<span></span>'}
-  </div>`;
-}
 function titleVariants(query) {
   const fixes = { resevior: 'reservoir', reservior: 'reservoir', resevoir: 'reservoir', reciev: 'receiv' };
   const words = query.toLowerCase().split(/\s+/);
@@ -1725,7 +1675,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.124</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.125</p>
   `;
 }
 
