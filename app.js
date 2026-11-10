@@ -34,6 +34,7 @@ function setViewMode(tabId, mode) {
   else if (tabId === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
   else if (tabId === 'watching') renderList('watching', m => m.status === 'watching');
   else if (tabId === 'least') renderLeastFavorite();
+  else if (tabId === 'search' && window._lastSearch) searchMovies(window._lastSearch.page || 1);
   else render();
 }
 
@@ -1175,6 +1176,7 @@ function clearSearch() {
 
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  window._lastSearch = { query, page };
   fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
     .then(r => r.json().then(data => ({ ok: r.ok, data })))
     .then(({ ok, data }) => {
@@ -1183,45 +1185,69 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
         resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(msg) + '. Check the API key in Settings.</div>';
         return;
       }
-      const hits = data.results || [];
+      const hits = (data.results || []).slice(0, 7);
       if (!hits.length) {
         resultsEl.innerHTML = '<div class="empty">No results for "' + escapeHtml(query) + '".</div>';
         return;
       }
       window.lastSearchResults = hits;
       const totalPages = data.total_pages || 1;
-      let html = hits.map((m, idx) => {
-        const title = endpoint === 'tv' ? m.name : m.title;
-        const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-        const poster = m.poster_path
-          ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
-          : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-        const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-        const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
-        return `
-          <div class="card" style="display:flex; align-items:center; padding:8px;">
-            ${poster}
-            <div style="flex:1;">
-              <div class="title">${escapeHtml(title)}${statusLabel}</div>
-              <div class="meta">${year}</div>
-            </div>
-            <div style="display:flex; gap:4px;">
-              <button onclick="showSearchDetails(${m.id}, '${endpoint}')" style="font-size:0.7rem; padding:4px 8px;">Details</button>
-              ${existing 
-                ? `<button onclick="removeFromLibrary(${m.id}, '${endpoint}')" style="font-size:0.7rem; padding:4px 8px; background:#5a1a1a;">Remove</button>`
-                : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
-              }
-            </div>
-          </div>
-        `;
-      }).join('');
-      if (totalPages > 1) {
-        const bar = pageBar(page, totalPages);
-        html = bar + html + bar;
-      }
-      resultsEl.innerHTML = html + '<button type="button" onclick="clearSearch()" style="margin-top:8px;">Done</button>';
+      const view = getViewMode('search');
+      const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
+      const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
+      resultsEl.innerHTML = `
+        <div class="tab-tools-row" style="justify-content:space-between;">
+          ${viewToggle('search')}
+          <button type="button" onclick="clearSearch()">Done</button>
+        </div>
+        ${bar}
+        <div class="list-container ${view}">${items}</div>
+        ${bar}
+      `;
     })
     .catch(err => resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(String(err)) + '</div>');
+}
+
+function renderSearchItem(m, idx, endpoint, view) {
+  const title = endpoint === 'tv' ? m.name : m.title;
+  const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+  const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
+  const statusLabel = existing ? ` · ${existing.status}` : '';
+  const poster = m.poster_path
+    ? `<img src="https://image.tmdb.org/t/p/w342${m.poster_path}" alt="" class="poster">`
+    : '<div class="poster poster-placeholder"></div>';
+  const small = m.poster_path
+    ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
+    : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+  const add = existing
+    ? `<button onclick="removeFromLibrary(${m.id}, '${endpoint}')">Remove</button>`
+    : `<button type="button" onclick="addFromSearchIndex(${idx})">Add</button>`;
+  const details = `<button onclick="showSearchDetails(${m.id}, '${endpoint}')">Details</button>`;
+
+  if (view === 'bullet') {
+    return `<div class="bullet-item">
+      <span class="bullet-title">${escapeHtml(title)}${statusLabel}</span>
+      <span class="bullet-actions" onclick="event.stopPropagation()">${details}${add}</span>
+    </div>`;
+  }
+  if (view === 'large') {
+    return `<div class="poster-card">
+      <div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">
+        ${poster}
+        <div class="poster-title">${escapeHtml(title)}</div>
+        <div class="poster-meta">${year}</div>
+      </div>
+      <div class="poster-actions" onclick="event.stopPropagation()">${details}${add}</div>
+    </div>`;
+  }
+  return `<div class="card" style="display:flex; align-items:center; padding:8px;">
+    ${small}
+    <div style="flex:1;">
+      <div class="title">${escapeHtml(title)}${statusLabel}</div>
+      <div class="meta">${year}</div>
+    </div>
+    <div style="display:flex; gap:4px;">${details}${add}</div>
+  </div>`;
 }
 
 function titleVariants(query) {
@@ -1746,7 +1772,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.136</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.137</p>
   `;
 }
 
