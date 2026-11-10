@@ -371,7 +371,7 @@ function watchlistFilterBar() {
   return `<div class="free-filters">
     <button type="button" onclick="document.getElementById('watchlistAdd').classList.toggle('hide')">+ Filter</button>
     <div id="watchlistAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-      ${available.map(g => `<button type="button" onclick="addWatchlistFilter('${escapeHtml(g)}')" style="padding:4px 10px; font-size:0.75rem; border-radius:6px; background:#141210; color:#f5f0e6; border:1px solid #2e2820;">${escapeHtml(g)}</button>`).join('')}
+      ${available.map(g => `<button type="button" onclick="addWatchlistFilter('${escapeHtml(g)}')" style="padding:4px 10px; font-size:0.75rem; border-radius:6px; background:#141210; color:#a89880; border:1px solid #2e2820;">${escapeHtml(g)}</button>`).join('')}
     </div>
     <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
   </div>`;
@@ -406,8 +406,8 @@ function movieCard(m, rank) {
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
   const origin = m.origin 
     ? (m.origin === 'theatrical' 
-        ? '<span style="background:#d4af37; color:#000; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px; font-weight:600;">Theatrical</span>'
-        : '<span style="background:#4b5563; color:#fff; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px;">Streaming</span>')
+        ? '<span style="background:#d4af37; color:#a89880; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px; font-weight:600;">Theatrical</span>'
+        : '<span style="background:#4b5563; color:#a89880; padding:1px 6px; border-radius:8px; font-size:0.65rem; margin-left:6px;">Streaming</span>')
     : '';
   return `
     <div class="card" style="cursor:pointer;" onclick="showDetails('${m.id}')">
@@ -482,9 +482,9 @@ function showDetails(id) {
     let originBadge = '';
     if (endpoint === 'movie' && details.release_dates?.results) {
       const us = details.release_dates.results.find(r => r.iso_3166_1 === 'US');
-      if (us && us.release_dates.some(d => d.type === 3)) originBadge = '<span style="background:#d4af37; color:#000; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Theatrical</span>';
+      if (us && us.release_dates.some(d => d.type === 3)) originBadge = '<span style="background:#d4af37; color:#a89880; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; margin-right:6px;">Theatrical</span>';
     }
-    if (!originBadge) originBadge = '<span style="background:#4b5563; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px;">Streaming</span>';
+    if (!originBadge) originBadge = '<span style="background:#4b5563; color:#a89880; padding:3px 8px; border-radius:12px; font-size:0.75rem; margin-right:6px;">Streaming</span>';
 
     // Included services as colored bubbles
     const colorMap = {
@@ -556,9 +556,9 @@ function showDetails(id) {
       const info = serviceLinks[name] || [`Included with a ${p.provider_name} subscription.`, ''];
       includedBubbles += `<button type="button" class="svc-bubble" style="background:${color}; color:${textColor};" onclick="showServiceInfo(this, '${escapeHtml(info[0]).replace(/'/g, "\\'")}', '${info[1]}')">${escapeHtml(p.provider_name)}</button>`;
     });
-    const includedSection = includedBubbles ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; gap:4px;"><span style="color:#aaa; font-size:0.75rem; margin-right:4px;">With subscription:</span>${includedBubbles}</div><div id="svcInfo" class="svc-info" hidden></div>` : '';
+    const includedSection = includedBubbles ? `<div style="margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; gap:4px;"><span style="color:#a89880; font-size:0.75rem; margin-right:4px;">With subscription:</span>${includedBubbles}</div><div id="svcInfo" class="svc-info" hidden></div>` : '';
 
-    const makeList = (arr) => arr.length ? arr.map(p => `<div style="font-size:0.8rem; margin:2px 0;">${escapeHtml(p.provider_name)}</div>`).join('') : '<div style="color:#666; font-size:0.75rem;">—</div>';
+    const makeList = (arr) => arr.length ? arr.map(p => `<div style="font-size:0.8rem; margin:2px 0;">${escapeHtml(p.provider_name)}</div>`).join('') : '<div style="color:#a89880; font-size:0.75rem;">—</div>';
 
     const modal = document.createElement('div');
     modal.className = 'sheet';
@@ -571,7 +571,7 @@ function showDetails(id) {
       <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:380px; width:100%; padding:14px; max-height:85vh; overflow-y:auto;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <h3 style="font-size:1rem;">${escapeHtml(m.title)}</h3>
-          <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
+          <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
         </div>
         <div style="display:flex; gap:10px; margin-bottom:10px;">
           ${posterBlock}
@@ -579,8 +579,8 @@ function showDetails(id) {
             <div style="margin-bottom:6px;">${originBadge}${trailerLink}</div>
           </div>
         </div>
-        <p style="color:#ddd; font-size:0.85rem; line-height:1.4; margin-bottom:10px;">${escapeHtml(overview)}</p>
-        <div style="font-size:0.75rem; color:#aaa; margin-bottom:10px;">
+        <p style="color:#a89880; font-size:0.85rem; line-height:1.4; margin-bottom:10px;">${escapeHtml(overview)}</p>
+        <div style="font-size:0.75rem; color:#a89880; margin-bottom:10px;">
           <div>${releaseDate} · ${escapeHtml(directors)}</div>
           <div>${escapeHtml(cast)}</div>
         </div>
@@ -591,7 +591,7 @@ function showDetails(id) {
             ${m.status === 'watched' && m.rating != null ? topActions(m) : ''}
             <button onclick="deleteMovie('${m.id}')" class="del">Delete</button>
           </div>
-          <textarea id="commentInput" placeholder="Note..." style="width:100%; min-height:40px; background:#141210; color:#f5f0e6; border:1px solid #2e2820; border-radius:6px; padding:6px; font-size:0.8rem;">${escapeHtml(m.notes || '')}</textarea>
+          <textarea id="commentInput" placeholder="Note..." style="width:100%; min-height:40px; background:#141210; color:#a89880; border:1px solid #2e2820; border-radius:6px; padding:6px; font-size:0.8rem;">${escapeHtml(m.notes || '')}</textarea>
           <button onclick="saveComment('${m.id}')" style="margin-top:4px; font-size:0.75rem;">Save</button>
         </div>
       </div>
@@ -639,7 +639,7 @@ function renderAllTime() {
 
   let html = tabHead(`<span class="tab-count">${list.length} watched${avg != null ? ' · avg ' + avg + '%' : ''}${favs ? ' · ' + favs + ' favorites' : ''}</span>`, 'alltime');
   html += `<div class="tab-tools-row">
-    <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:10px; border-radius:8px;">
+    <select id="alltimeSort" onchange="renderAllTime()" style="background:#141210; color:#a89880; border:1px solid #2e2820; padding:10px; border-radius:8px;">
       <option value="rating" ${sortBy==='rating'?'selected':''}>Best Rated</option>
       <option value="worst" ${sortBy==='worst'?'selected':''}>Least Rated</option>
       <option value="title" ${sortBy==='title'?'selected':''}>Title</option>
@@ -847,7 +847,7 @@ function renderSeasonal(page = 1) {
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
         const posterPath = m.poster_path || '';
         const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-        const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status}</span>` : '';
+        const statusLabel = existing ? `<span style="color:#d4af37; font-size:0.7rem;"> · ${existing.status}</span>` : '';
         const addBtn = existing ? '' : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${endpoint}', '${posterPath}', 'streaming')">Add</button>`;
         const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
         const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
@@ -1128,16 +1128,16 @@ function showPersonCredits(person, apiKey, resultsEl, query) {
             ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">`
             : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
           const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === (m.media_type || 'movie'));
-          const statusLabel = existing ? `<span style="color:#4ade80; font-size:0.7rem;"> · ${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : '';
+          const statusLabel = existing ? `<span style="color:#d4af37; font-size:0.7rem;"> · ${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : '';
           html += `
             <div class="card" style="display:flex; align-items:center; padding:6px 8px; margin-bottom:6px;${existing ? ' border-left:4px solid #4ade80; background:#1a2e1a;' : ''}">
               ${poster}
               <div style="flex:1; min-width:0;">
-                <div class="title">${escapeHtml(title || '')} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span>${statusLabel}</div>
+                <div class="title">${escapeHtml(title || '')} <span style="color:#a89880; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span>${statusLabel}</div>
                 <div class="meta">${year}${role ? ' · ' + escapeHtml(role) : ''}</div>
               </div>
               ${existing
-                ? `<button type="button" disabled style="font-size:0.7rem; padding:4px 8px; background:#166534; border-color:#166534; color:#fff;">Added</button>`
+                ? `<button type="button" disabled style="font-size:0.7rem; padding:4px 8px; background:#166534; border-color:#d4af37; color:#a89880;">Added</button>`
                 : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
               }
             </div>`;
@@ -1289,7 +1289,7 @@ function renderDiscoverResults(data, resultsEl, page, endpoint, apiKey) {
       <div class="card" style="display:flex; align-items:center; padding:8px;">
         ${poster}
         <div style="flex:1;">
-          <div class="title">${escapeHtml(title)} <span style="color:#aaa; font-size:0.7rem;">(${endpoint === 'tv' ? 'TV' : 'Movie'})</span></div>
+          <div class="title">${escapeHtml(title)} <span style="color:#a89880; font-size:0.7rem;">(${endpoint === 'tv' ? 'TV' : 'Movie'})</span></div>
           <div class="meta">${year}</div>
         </div>
         <div style="display:flex; gap:4px;">
@@ -1318,7 +1318,7 @@ function renderPersonResults(items, resultsEl, apiKey) {
       <div class="card" style="display:flex; align-items:center; padding:8px;">
         ${poster}
         <div style="flex:1;">
-          <div class="title">${escapeHtml(title)} <span style="color:#aaa; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
+          <div class="title">${escapeHtml(title)} <span style="color:#a89880; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span></div>
           <div class="meta">${year}</div>
         </div>
         <div style="display:flex; gap:4px;">
@@ -1341,7 +1341,7 @@ function showRecentSearches() {
   }
   resultsEl.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <span style="color:#aaa; font-size:0.8rem;">Recent searches</span>
+      <span style="color:#a89880; font-size:0.8rem;">Recent searches</span>
       <button onclick="clearSearchHistory()" style="font-size:0.7rem; padding:3px 8px; background:#5a1a1a;">Clear</button>
     </div>
   ` + recent.map(q => `
@@ -1563,7 +1563,7 @@ function editRating(id) {
     <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:360px; width:100%; padding:18px;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
         <h3 style="font-size:1.05rem;">Rate ${escapeHtml(m.title)}</h3>
-        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
       </div>
       <p style="color:#a89880; font-size:0.82rem; margin-bottom:12px;">0–100. Saving marks it watched.</p>
       <div class="rate-row">
@@ -1749,7 +1749,7 @@ function renderSettings() {
     <div class="backup-box">
       <div class="stat-label" style="margin-bottom:6px;">TMDB API Key</div>
       <p class="backup-note">Search, details, seasonal, and recommendations need a free key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org/settings/api</a>.</p>
-      <input id="settingsKey" type="text" value="${escapeHtml(key)}" placeholder="Paste your TMDB key" autocomplete="off" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-bottom:10px;">
+      <input id="settingsKey" type="text" value="${escapeHtml(key)}" placeholder="Paste your TMDB key" autocomplete="off" style="width:100%; background:#141210; color:#a89880; border:1px solid #2e2820; padding:11px; border-radius:10px; margin-bottom:10px;">
       <button type="button" onclick="saveApiKey()" style="background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save Key</button>
     </div>
     <div class="backup-box">
@@ -1772,7 +1772,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.137</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.138</p>
   `;
 }
 
