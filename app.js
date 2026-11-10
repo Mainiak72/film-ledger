@@ -1,5 +1,6 @@
 let movies = JSON.parse(localStorage.getItem('movies') || '[]');
 let currentMode = 'movie'; // 'movie' or 'tv'
+let suggestTimer = null;
 
 function save() {
   localStorage.setItem('movies', JSON.stringify(movies));
@@ -1013,39 +1014,10 @@ function searchMovies(page = 1) {
   resultsEl.style.minHeight = '60px';
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const yearMatch = query.match(/^(19|20)\d{2}$/);
-  const genreMap = {
-    action: 28, adventure: 12, animation: 16, comedy: 35, crime: 80,
-    documentary: 99, drama: 18, family: 10751, fantasy: 14, history: 36,
-    horror: 27, music: 10402, mystery: 9648, romance: 10749, 'sci-fi': 878,
-    science: 878, thriller: 53, war: 10752, western: 37
-  };
-  const genreKey = Object.keys(genreMap).find(g => query.toLowerCase().includes(g));
-
-  // Year-only search
-  if (yearMatch && query.length === 4) {
-    const year = query;
-    const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-    const yearParam = endpoint === 'tv' ? `first_air_date_year=${year}` : `primary_release_year=${year}`;
-    fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&${yearParam}&language=en-US&sort_by=popularity.desc&page=${page}`)
-      .then(r => r.json())
-      .then(data => renderDiscoverResults(data, resultsEl, page, endpoint, apiKey))
-      .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+  if (location.protocol === 'file:') {
+    resultsEl.innerHTML = '<div class="empty">Search needs a web server. Open this folder with a local server, or use the GitHub site. file:// blocks the movie API.</div>';
     return;
   }
-
-  // Genre search
-  if (genreKey && query.toLowerCase().split(/\s+/).length <= 3) {
-    const genreId = genreMap[genreKey];
-    const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-    fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&sort_by=popularity.desc&page=${page}`)
-      .then(r => r.json())
-      .then(data => renderDiscoverResults(data, resultsEl, page, endpoint, apiKey))
-      .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
-    return;
-  }
-
-  // Prefer titles. If the query is a clear person name, show their work instead.
   doTitleSearch(query, page, apiKey, resultsEl);
 }
 
@@ -1698,13 +1670,13 @@ const ALL_TABS = [
   ['watchlist', 'Watchlist'],
   ['watching', 'Watching'],
   ['alltime', 'Watched'],
+  ['search', 'Search'],
+  ['recs', 'Recommended'],
+  ['seasonal', 'Seasonal'],
   ['top10', 'Top 10'],
   ['decades', 'Decades'],
   ['least', 'Least'],
   ['stats', 'Stats'],
-  ['recs', 'Recommended'],
-  ['seasonal', 'Seasonal'],
-  ['search', 'Search'],
   ['settings', 'Settings']
 ];
 
@@ -1766,7 +1738,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.133</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.134</p>
   `;
 }
 
@@ -1840,6 +1812,7 @@ function startLedger() {
     setTimeout(() => renderRecommendations(1), 800);
   }
   render();
+  renderSearchTab();
   applyTabVisibility();
 }
 
