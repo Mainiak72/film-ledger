@@ -1540,7 +1540,11 @@ function editRating(id) {
         <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#aaa; font-size:1.4rem; cursor:pointer;">×</button>
       </div>
       <p style="color:#a89880; font-size:0.82rem; margin-bottom:12px;">0–100. Saving marks it watched.</p>
-      <input id="rateInput" type="number" min="0" max="100" inputmode="numeric" value="${m.rating != null ? m.rating : ''}" placeholder="0–100" style="width:100%; background:#141210; color:#f5f0e6; border:1px solid #2e2820; padding:12px; border-radius:10px; font-size:1.1rem; margin-bottom:12px;">
+      <div class="rate-row">
+        <button type="button" class="rate-step" onclick="stepRating(-1)">−</button>
+        <input id="rateInput" type="number" min="0" max="100" inputmode="numeric" value="${m.rating != null ? m.rating : ''}" placeholder="0–100">
+        <button type="button" class="rate-step" onclick="stepRating(1)">+</button>
+      </div>
       <div style="display:flex; gap:8px;">
         <button type="button" onclick="saveRating('${m.id}')" style="flex:1; background:#d4af37; color:#1a1408; border-color:#d4af37; font-weight:700;">Save</button>
         <button type="button" onclick="this.closest('.sheet').remove()" style="flex:1;">Cancel</button>
@@ -1555,6 +1559,15 @@ function editRating(id) {
     input.select();
     input.addEventListener('keydown', e => { if (e.key === 'Enter') saveRating(id); });
   }
+}
+
+function stepRating(delta) {
+  const input = document.getElementById('rateInput');
+  if (!input) return;
+  let n = parseInt(input.value, 10);
+  if (isNaN(n)) n = 0;
+  n = Math.max(0, Math.min(100, n + delta));
+  input.value = n;
 }
 
 function saveRating(id) {
@@ -1733,7 +1746,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.135</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.136</p>
   `;
 }
 
