@@ -822,8 +822,10 @@ function renderRecommendations(page = 1) {
 function onSearchInput() {
   clearTimeout(suggestTimer);
   const q = document.getElementById('searchQuery').value.trim();
+  const box = document.getElementById('suggestions');
+  if (!box) return;
   if (q.length < 2) {
-    document.getElementById('suggestions').innerHTML = '';
+    box.innerHTML = '';
     return;
   }
   suggestTimer = setTimeout(() => fetchSuggestions(q), 220);
@@ -935,8 +937,10 @@ function searchMovies(page = 1) {
   }
 
   const resultsEl = document.getElementById('searchResults');
+  if (!resultsEl) { alert('Search results area missing.'); return; }
   resultsEl.innerHTML = '<div class="empty">Searching...</div>';
-  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  resultsEl.style.display = 'block';
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const yearMatch = query.match(/^(19|20)\d{2}$/);
   const genreMap = {
@@ -1721,7 +1725,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.123</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.124</p>
   `;
 }
 

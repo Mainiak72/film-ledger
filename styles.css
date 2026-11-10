@@ -305,11 +305,12 @@ button:hover {
 
 #searchResults {
   padding: 0 12px 8px;
-  max-height: 48vh;
+  max-height: 50vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #3a3328 transparent;
+  display: block;
 }
 
 #searchResults .card {
