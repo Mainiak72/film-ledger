@@ -80,10 +80,7 @@ function setViewMode(tabId, mode) {
   else if (tabId === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
   else if (tabId === 'watching') renderList('watching', m => m.status === 'watching');
   else if (tabId === 'least') renderLeastFavorite();
-  else if (tabId === 'search') {
-    if (window._discover) discoverPage(window._discover.page || 1);
-    else if (window._lastSearch) searchMovies(window._lastSearch.page || 1);
-  }
+  else if (tabId === 'search') refreshSearchView();
   else render();
 }
 
@@ -1274,6 +1271,45 @@ function pickSuggestion(i) {
   searchMovies();
 }
 
+function refreshSearchView() {
+  const resultsEl = document.getElementById('searchResults');
+  if (!resultsEl) return;
+  if (window._personView && window._personCredits) {
+    paintPersonCredits(window._personView.person, window._personCredits, resultsEl);
+    return;
+  }
+  if (window._discover && window._discoverData) {
+    paintDiscover(resultsEl, window._discoverData, window._discover.endpoint || (currentMode === 'tv' ? 'tv' : 'movie'), window._discover.name, window._discover.page || 1);
+    return;
+  }
+  if (window._lastSearchData) {
+    paintTitleResults(window._lastSearchData, window._lastSearch.page || 1);
+  }
+}
+
+function paintTitleResults(data, page) {
+  const resultsEl = document.getElementById('searchResults');
+  if (!resultsEl) return;
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  const hits = (data.results || []).slice(0, 7);
+  window.lastSearchResults = hits;
+  const boxes = searchBoxesHtml(window._lastSearch?.query || '', window._searchBoxes?.genre, window._searchBoxes?.person, window._searchBoxes?.company);
+  const totalPages = data.total_pages || 1;
+  const view = getViewMode('search');
+  const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
+  const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
+  resultsEl.innerHTML = `
+    ${boxes}
+    <div class="search-tools-sticky tab-tools-row" style="justify-content:space-between;">
+      ${viewToggle('search')}
+      <button type="button" onclick="clearSearch()">Done</button>
+    </div>
+    ${bar}
+    <div class="list-container ${view}">${items || '<div class="empty">No title matches.</div>'}</div>
+    ${bar}
+  `;
+}
+
 function clearDiscover() {
   window._discover = null;
   searchMovies(window._lastSearch?.page || 1);
@@ -1281,7 +1317,7 @@ function clearDiscover() {
 
 function searchMovies(page = 1) {
   clearTimeout(suggestTimer);
-  if (page === 1) window._discover = null;
+  if (page === 1) { window._discover = null; window._personView = null; }
   const sugg = document.getElementById('suggestions');
   if (sugg) sugg.innerHTML = '';
   const queryEl = document.getElementById('searchQuery');
@@ -1398,49 +1434,49 @@ function groupPersonCredits(person, credits) {
 }
 
 function showPersonCredits(person, apiKey, resultsEl, query) {
-  resultsEl.innerHTML = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div><div class="empty" style="margin-bottom:6px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
+  window._personView = { person, apiKey };
+  resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(person.name) + '...</div>';
   fetch(`https://api.themoviedb.org/3/person/${person.id}/combined_credits?api_key=${apiKey}`)
     .then(r => r.json())
     .then(credits => {
-      const sections = groupPersonCredits(person, credits);
-      if (!sections.length) {
-        resultsEl.innerHTML = '<div class="empty">No results.</div>';
-        return;
-      }
-      const flat = [];
-      let html = `<div class="page-bar"><button type="button" onclick="clearResults()">Done</button></div><div class="empty" style="margin-bottom:6px;">Showing work by <strong>${escapeHtml(person.name)}</strong> (${person.known_for_department || 'Person'})</div>`;
-      sections.forEach(section => {
-        html += `<div class="stat-label" style="margin:10px 4px 4px;">${escapeHtml(section.label)}</div>`;
-        section.items.forEach(m => {
-          const idx = flat.length;
-          flat.push(m);
-          const isTV = m.media_type === 'tv';
-          const title = isTV ? m.name : m.title;
-          const year = creditYear(m) || '';
-          const role = m.job || m.character || '';
-          const poster = m.poster_path
-            ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">`
-            : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-          const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === (m.media_type || 'movie'));
-          const statusLabel = existing ? `<span style="color:#d4af37; font-size:0.7rem;"> · ${existing.status === 'watched' ? 'Watched' : existing.status}</span>` : '';
-          html += `
-            <div class="card" style="display:flex; align-items:center; padding:6px 8px; margin-bottom:6px;${existing ? ' border-left:4px solid #4ade80; background:#1a2e1a;' : ''}">
-              ${poster}
-              <div style="flex:1; min-width:0;">
-                <div class="title">${escapeHtml(title || '')} <span style="color:#a89880; font-size:0.7rem;">(${isTV ? 'TV' : 'Movie'})</span>${statusLabel}</div>
-                <div class="meta">${year}${role ? ' · ' + escapeHtml(role) : ''}</div>
-              </div>
-              ${existing
-                ? `<button type="button" disabled style="font-size:0.7rem; padding:4px 8px; background:#166534; border-color:#d4af37; color:#a89880;">Added</button>`
-                : `<button type="button" onclick="addFromSearchIndex(${idx})" style="font-size:0.7rem; padding:4px 8px; background:#e50914;">Add</button>`
-              }
-            </div>`;
-        });
-      });
-      window.lastSearchResults = flat;
-      resultsEl.innerHTML = html;
+      window._personCredits = credits;
+      paintPersonCredits(person, credits, resultsEl);
     })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Search failed.</div>');
+}
+
+function paintPersonCredits(person, credits, resultsEl) {
+  const sections = groupPersonCredits(person, credits);
+  if (!sections.length) {
+    resultsEl.innerHTML = '<div class="empty">No results.</div>';
+    return;
+  }
+  const view = getViewMode('search');
+  const flat = [];
+  let items = '';
+  sections.forEach(section => {
+    items += `<div class="stat-label" style="margin:10px 4px 4px;">${escapeHtml(section.label)}</div>`;
+    section.items.forEach(m => {
+      const idx = flat.length;
+      flat.push(m);
+      items += renderSearchItem(m, idx, m.media_type || 'movie', view);
+    });
+  });
+  window.lastSearchResults = flat;
+  resultsEl.innerHTML = `
+    <div class="search-box-row"><button type="button" class="search-box" onclick="clearPerson()">Back</button></div>
+    <div class="search-tools-sticky tab-tools-row" style="justify-content:space-between;">
+      ${viewToggle('search')}
+      <button type="button" onclick="clearSearch()">Done</button>
+    </div>
+    <div class="meta" style="margin-bottom:8px;">${escapeHtml(person.name)} · ${escapeHtml(person.known_for_department || 'Person')}</div>
+    <div class="list-container ${view}">${items}</div>
+  `;
+}
+
+function clearPerson() {
+  window._personView = null;
+  searchMovies(window._lastSearch?.page || 1);
 }
 
 function doPersonSearch(query, apiKey, resultsEl) {
@@ -1512,22 +1548,9 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
     }
     const hits = (titleRes.data.results || []).slice(0, 7);
     window.lastSearchResults = hits;
+    window._lastSearchData = titleRes.data;
     window._searchBoxes = { person, company, genre };
-    const boxes = searchBoxesHtml(query, genre, person, company);
-    const totalPages = titleRes.data.total_pages || 1;
-    const view = getViewMode('search');
-    const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
-    const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
-    resultsEl.innerHTML = `
-      ${boxes}
-      <div class="search-tools-sticky tab-tools-row" style="justify-content:space-between;">
-        ${viewToggle('search')}
-        <button type="button" onclick="clearSearch()">Done</button>
-      </div>
-      ${bar}
-      <div class="list-container ${view}">${items || '<div class="empty">No title matches.</div>'}</div>
-      ${bar}
-    `;
+    paintTitleResults(titleRes.data, page);
   });
 }
 
@@ -1582,7 +1605,7 @@ function showGenreResults(genreId, name, page = 1) {
   resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
     .then(r => r.json())
-    .then(data => paintDiscover(resultsEl, data, endpoint, name, page))
+    .then(data => { window._discover.endpoint = endpoint; window._discoverData = data; paintDiscover(resultsEl, data, endpoint, name, page); })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Failed to load genre.</div>');
 }
 
@@ -1594,7 +1617,7 @@ function showCompanyResults(companyId, name, page = 1) {
   resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_companies=${companyId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
     .then(r => r.json())
-    .then(data => paintDiscover(resultsEl, data, endpoint, name, page))
+    .then(data => { window._discover.endpoint = endpoint; window._discoverData = data; paintDiscover(resultsEl, data, endpoint, name, page); })
     .catch(() => resultsEl.innerHTML = '<div class="empty">Failed to load studio.</div>');
 }
 
@@ -1624,8 +1647,8 @@ function paintDiscover(resultsEl, data, endpoint, label, page) {
 function renderSearchItem(m, idx, endpoint, view) {
   const title = endpoint === 'tv' ? m.name : m.title;
   const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-  const existing = movies.find(x => x.tmdbId === m.id && (x.mediaType || 'movie') === endpoint);
-  const statusLabel = existing ? ` · ${existing.status}` : '';
+  const existing = movies.find(x => String(x.tmdbId) === String(m.id) && (x.mediaType || 'movie') === (endpoint || 'movie'));
+  const statusLabel = existing ? ' · Added' : '';
   const poster = m.poster_path
     ? `<img src="https://image.tmdb.org/t/p/w342${m.poster_path}" alt="" class="poster">`
     : '<div class="poster poster-placeholder"></div>';
@@ -1931,8 +1954,7 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
   renderSettings();
   // Keep search results so user can add sequels / more from the same search
   markSearchResultAdded(tmdbId, mediaType, title);
-  if (window._discover) discoverPage(window._discover.page || 1);
-  else if (window._lastSearch && document.getElementById('searchResults')?.innerHTML) searchMovies(window._lastSearch.page || 1);
+  refreshSearchView();
 }
 
 function markSearchResultAdded(tmdbId, mediaType, title) {
@@ -2205,7 +2227,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.19</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.20</p>
   `;
 }
 
