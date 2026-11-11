@@ -763,41 +763,7 @@ nav button.active {
   color: var(--accent);
   font-weight: 700;
   font-size: 0.9rem;
-}
   white-space: nowrap;
-}
-
-.view-toggle {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--surface);
-  padding: 3px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-}
-
-.view-toggle button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  width: 34px;
-  height: 30px;
-  padding: 0;
-  border-radius: 7px;
-  font-size: 0.95rem;
-  line-height: 1;
-  font-weight: 500;
-}
-
-.view-toggle button.active {
-  background: transparent;
-  color: var(--accent);
-  font-weight: 700;
-  transform: scale(1.12);
 }
 
 .free-filters { margin-top: 12px; }
@@ -823,8 +789,11 @@ nav button.active {
   margin-right: 4px;
 }
 .ia-watch:hover { background: #e8c547; }
+
+.tab-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -840,10 +809,46 @@ nav button.active {
 
 .tab-tools {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+.view-toggle {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.view-toggle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+
+.view-toggle button.active {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .refresh-btn {
