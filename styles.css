@@ -798,6 +798,31 @@ nav button.active {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+  padding: 6px 0;
+}
+
+.view-toggle {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.search-tools-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+  padding: 6px 0;
 }
 
 .tab-head h3 { margin: 0; }
@@ -816,16 +841,10 @@ nav button.active {
   margin-left: auto;
 }
 
-.view-toggle {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 4px;
-  background: var(--surface);
-  padding: 4px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+.added-btn {
+  background: #166534 !important;
+  border-color: #166534 !important;
+  color: #fff !important;
 }
 
 .view-toggle button {

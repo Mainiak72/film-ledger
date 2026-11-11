@@ -80,7 +80,10 @@ function setViewMode(tabId, mode) {
   else if (tabId === 'watchlist') renderList('watchlist', m => m.status === 'watchlist');
   else if (tabId === 'watching') renderList('watching', m => m.status === 'watching');
   else if (tabId === 'least') renderLeastFavorite();
-  else if (tabId === 'search' && window._lastSearch) searchMovies(window._lastSearch.page || 1);
+  else if (tabId === 'search') {
+    if (window._discover) discoverPage(window._discover.page || 1);
+    else if (window._lastSearch) searchMovies(window._lastSearch.page || 1);
+  }
   else render();
 }
 
@@ -1271,8 +1274,14 @@ function pickSuggestion(i) {
   searchMovies();
 }
 
+function clearDiscover() {
+  window._discover = null;
+  searchMovies(window._lastSearch?.page || 1);
+}
+
 function searchMovies(page = 1) {
   clearTimeout(suggestTimer);
+  if (page === 1) window._discover = null;
   const sugg = document.getElementById('suggestions');
   if (sugg) sugg.innerHTML = '';
   const queryEl = document.getElementById('searchQuery');
@@ -1494,7 +1503,7 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   window._lastSearch = { query, page };
   const genre = matchGenre(query);
   const personP = fetch(`https://api.themoviedb.org/3/search/person?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=1`).then(r => r.json()).then(d => (d.results || [])[0]).catch(() => null);
-  const companyP = fetch(`https://api.themoviedb.org/3/search/company?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&page=1`).then(r => r.json()).then(d => (d.results || [])[0]).catch(() => null);
+  const companyP = fetch(`https://api.themoviedb.org/3/search/company?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&page=1`).then(r => r.json()).then(d => pickStudio(d.results || [], query)).catch(() => null);
   const titlesP = fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`).then(r => r.json().then(data => ({ ok: r.ok, data }))).catch(err => ({ ok: false, data: { status_message: String(err) } }));
   Promise.all([personP, companyP, titlesP]).then(([person, company, titleRes]) => {
     if (!titleRes.ok || titleRes.data.status_code) {
@@ -1511,7 +1520,7 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
     const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
     resultsEl.innerHTML = `
       ${boxes}
-      <div class="tab-tools-row" style="justify-content:space-between;">
+      <div class="search-tools-sticky tab-tools-row" style="justify-content:space-between;">
         ${viewToggle('search')}
         <button type="button" onclick="clearSearch()">Done</button>
       </div>
@@ -1520,6 +1529,31 @@ function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
       ${bar}
     `;
   });
+}
+
+function pickStudio(results, query) {
+  const known = {
+    paramount: 4, disney: 2, 'walt disney': 2, lucasfilm: 1, 'lucas film': 1, 'lucas films': 1,
+    'warner bros': 174, 'warner brothers': 174, universal: 33, columbia: 5,
+    '20th century': 25, fox: 25, miramax: 14, 'a band apart': 59, 'band apart': 59
+  };
+  const q = query.toLowerCase().trim();
+  if (known[q]) {
+    const names = { 4: 'Paramount Pictures', 2: 'Walt Disney Pictures', 1: 'Lucasfilm', 174: 'Warner Bros. Pictures', 33: 'Universal Pictures', 5: 'Columbia Pictures', 25: '20th Century Fox', 14: 'Miramax', 59: 'A Band Apart' };
+    return { id: known[q], name: names[known[q]] || query };
+  }
+  const scored = results.map(c => {
+    const name = (c.name || '').toLowerCase();
+    let score = 0;
+    if (name === q) score += 12;
+    if (name.startsWith(q)) score += 6;
+    if (name.includes(q)) score += 3;
+    if (/pictures|films|studios|productions/.test(name)) score += 8;
+    if (/\+|network|channel|streaming|television|\btv\b/.test(name)) score -= 20;
+    return { c, score };
+  }).sort((a, b) => b.score - a.score);
+  const best = scored.find(s => s.score > 0);
+  return best ? best.c : null;
 }
 
 function searchBoxesHtml(query, genre, person, company) {
@@ -1544,7 +1578,7 @@ function showGenreResults(genreId, name, page = 1) {
   const apiKey = localStorage.getItem('tmdbKey') || '';
   const resultsEl = document.getElementById('searchResults');
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  window._discover = { type: 'genre', genreId, name };
+  window._discover = { type: 'genre', genreId, name, page };
   resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
     .then(r => r.json())
@@ -1556,7 +1590,7 @@ function showCompanyResults(companyId, name, page = 1) {
   const apiKey = localStorage.getItem('tmdbKey') || '';
   const resultsEl = document.getElementById('searchResults');
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
-  window._discover = { type: 'company', companyId, name };
+  window._discover = { type: 'company', companyId, name, page };
   resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_companies=${companyId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
     .then(r => r.json())
@@ -1578,8 +1612,8 @@ function paintDiscover(resultsEl, data, endpoint, label, page) {
   const total = data.total_pages || 1;
   const bar = pageBar(page, Math.min(total, 50), 'discoverPage');
   resultsEl.innerHTML = `
-    <div class="search-box-row"><button type="button" class="search-box" onclick="searchMovies()"><span>Back</span>Search</button></div>
-    <div class="tab-tools-row" style="justify-content:space-between;">${viewToggle('search')}<button type="button" onclick="clearSearch()">Done</button></div>
+    <div class="search-box-row"><button type="button" class="search-box" onclick="clearDiscover()">Back</button></div>
+    <div class="search-tools-sticky tab-tools-row" style="justify-content:space-between;">${viewToggle('search')}<button type="button" onclick="clearSearch()">Done</button></div>
     <div class="meta" style="margin-bottom:8px;">${escapeHtml(label)}</div>
     ${bar}
     <div class="list-container ${view}">${items || '<div class="empty">Nothing here.</div>'}</div>
@@ -1599,7 +1633,7 @@ function renderSearchItem(m, idx, endpoint, view) {
     ? `<img src="https://image.tmdb.org/t/p/w92${m.poster_path}" style="width:42px; height:63px; border-radius:4px; object-fit:cover; margin-right:8px;">`
     : '<div style="width:42px; height:63px; background:#222; border-radius:4px; margin-right:8px;"></div>';
   const add = existing
-    ? `<button onclick="removeFromLibrary(${m.id}, '${endpoint}')">Remove</button>`
+    ? `<button type="button" class="added-btn" disabled>Added</button>`
     : `<button type="button" onclick="addFromSearchIndex(${idx})">Add</button>`;
   const details = `<button onclick="showSearchDetails(${m.id}, '${endpoint}')">Details</button>`;
 
@@ -1897,6 +1931,8 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
   renderSettings();
   // Keep search results so user can add sequels / more from the same search
   markSearchResultAdded(tmdbId, mediaType, title);
+  if (window._discover) discoverPage(window._discover.page || 1);
+  else if (window._lastSearch && document.getElementById('searchResults')?.innerHTML) searchMovies(window._lastSearch.page || 1);
 }
 
 function markSearchResultAdded(tmdbId, mediaType, title) {
@@ -2169,7 +2205,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.18</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.19</p>
   `;
 }
 
