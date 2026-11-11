@@ -56,11 +56,11 @@ a, .title, .bullet-title, .poster-title { color: var(--accent); }
 
 .brand-mark {
   width: 100%;
-  max-width: 760px;
-  max-height: 150px;
+  max-width: 900px;
+  max-height: 220px;
   height: auto;
   display: block;
-  margin: 4px auto;
+  margin: 8px auto;
   object-fit: contain;
 }
 
