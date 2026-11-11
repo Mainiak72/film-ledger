@@ -1133,12 +1133,16 @@ function paintRecommendations(el, items, page, seed, seeds, watched, pick, decad
     const title = isTV ? m.name : m.title;
     const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
     const posterPath = m.poster_path || '';
+    const already = movies.some(x => String(x.tmdbId) === String(m.id) && (x.mediaType || 'movie') === m.endpoint);
+    const halo = already ? ' added-halo' : '';
     const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
     const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-    const addBtn = `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${m.endpoint}', '${posterPath}', 'streaming')">Add</button>`;
-    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${m.endpoint}')"><span class="bullet-title">${escapeHtml(title)}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
-    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${m.endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}</div></div>`;
-    return `<div class="card" style="display:flex; align-items:center; padding:8px;"><div style="display:flex; align-items:center; cursor:pointer; flex:1;" onclick="showSearchDetails(${m.id}, '${m.endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}</div><div class="meta">${year}</div></div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>`;
+    const addBtn = already
+      ? `<button type="button" class="added-btn" disabled>Added</button>`
+      : `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${m.endpoint}', '${posterPath}', 'streaming')">Add</button>`;
+    if (view === 'bullet') return `<div class="bullet-item${halo}" onclick="showSearchDetails(${m.id}, '${m.endpoint}')"><span class="bullet-title">${escapeHtml(title)}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
+    if (view === 'large') return `<div class="poster-card${halo}"><div onclick="showSearchDetails(${m.id}, '${m.endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}</div></div>`;
+    return `<div class="card${halo}" style="display:flex; align-items:center; padding:8px;"><div style="display:flex; align-items:center; cursor:pointer; flex:1;" onclick="showSearchDetails(${m.id}, '${m.endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}</div><div class="meta">${year}</div></div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>`;
   }).join('');
   el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `
     <div class="pick-row">
@@ -1455,7 +1459,7 @@ function paintPersonCredits(person, credits, resultsEl) {
   const flat = [];
   let items = '';
   sections.forEach(section => {
-    items += `<div class="stat-label" style="margin:10px 4px 4px;">${escapeHtml(section.label)}</div>`;
+    items += `<div class="section-divider">${escapeHtml(section.label)}</div>`;
     section.items.forEach(m => {
       const idx = flat.length;
       flat.push(m);
@@ -1649,6 +1653,7 @@ function renderSearchItem(m, idx, endpoint, view) {
   const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
   const existing = movies.find(x => String(x.tmdbId) === String(m.id) && (x.mediaType || 'movie') === (endpoint || 'movie'));
   const statusLabel = existing ? ' · Added' : '';
+  const halo = existing ? ' added-halo' : '';
   const poster = m.poster_path
     ? `<img src="https://image.tmdb.org/t/p/w342${m.poster_path}" alt="" class="poster">`
     : '<div class="poster poster-placeholder"></div>';
@@ -1661,13 +1666,13 @@ function renderSearchItem(m, idx, endpoint, view) {
   const details = `<button onclick="showSearchDetails(${m.id}, '${endpoint}')">Details</button>`;
 
   if (view === 'bullet') {
-    return `<div class="bullet-item">
+    return `<div class="bullet-item${halo}">
       <span class="bullet-title">${escapeHtml(title)}${statusLabel}</span>
       <span class="bullet-actions" onclick="event.stopPropagation()">${details}${add}</span>
     </div>`;
   }
   if (view === 'large') {
-    return `<div class="poster-card">
+    return `<div class="poster-card${halo}">
       <div onclick="showSearchDetails(${m.id}, '${endpoint}')" style="cursor:pointer;">
         ${poster}
         <div class="poster-title">${escapeHtml(title)}</div>
@@ -1676,7 +1681,7 @@ function renderSearchItem(m, idx, endpoint, view) {
       <div class="poster-actions" onclick="event.stopPropagation()">${details}${add}</div>
     </div>`;
   }
-  return `<div class="card" style="display:flex; align-items:center; padding:8px;">
+  return `<div class="card${halo}" style="display:flex; align-items:center; padding:8px;">
     ${small}
     <div style="flex:1;">
       <div class="title">${escapeHtml(title)}${statusLabel}</div>
@@ -1955,6 +1960,7 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
   // Keep search results so user can add sequels / more from the same search
   markSearchResultAdded(tmdbId, mediaType, title);
   refreshSearchView();
+  if (window._recsCache) renderRecommendations(recsPage);
 }
 
 function markSearchResultAdded(tmdbId, mediaType, title) {
@@ -2227,7 +2233,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.20</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.21</p>
   `;
 }
 

@@ -798,9 +798,6 @@ nav button.active {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
-  position: sticky;
-  top: 0;
-  z-index: 6;
   background: var(--bg);
   padding: 6px 0;
 }
@@ -818,11 +815,24 @@ nav button.active {
 }
 
 .search-tools-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 6;
   background: var(--bg);
   padding: 6px 0;
+}
+
+.section-divider {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin: 8px 0 2px;
+}
+
+.added-halo {
+  box-shadow: 0 0 0 2px #16a34a;
+  border-color: #16a34a;
 }
 
 .tab-head h3 { margin: 0; }
