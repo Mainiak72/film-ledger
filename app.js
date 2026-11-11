@@ -2,26 +2,29 @@ let movies = JSON.parse(localStorage.getItem('movies') || '[]');
 let currentMode = 'movie'; // 'movie' or 'tv'
 let suggestTimer = null;
 
-function countryCode(details, isTV) {
-  const map = { US: 'USA', GB: 'UK', FR: 'FRA', DE: 'GER', IT: 'ITA', JP: 'JPN', KR: 'KOR', CN: 'CHN', AU: 'AUS', CA: 'CAN', MX: 'MEX', ES: 'ESP', IN: 'IND', BR: 'BRA', RU: 'RUS', SE: 'SWE', DK: 'DEN', NL: 'NED', IE: 'IRE', NZ: 'NZL', HK: 'HKG' };
-  const raw = isTV
-    ? (details.origin_country || [])[0]
-    : (details.production_countries || [])[0]?.iso_3166_1;
+function languageCode(details) {
+  const map = {
+    en: 'ENG', fr: 'FRA', es: 'SPA', de: 'GER', it: 'ITA', ja: 'JPN', ko: 'KOR',
+    zh: 'CHI', cn: 'CHI', pt: 'POR', ru: 'RUS', sv: 'SWE', da: 'DAN', nl: 'DUT',
+    pl: 'POL', hi: 'HIN', ar: 'ARA', tr: 'TUR', th: 'THA', vi: 'VIE', el: 'GRE',
+    he: 'HEB', cs: 'CZE', hu: 'HUN', fi: 'FIN', no: 'NOR', ro: 'RUM'
+  };
+  const raw = details.original_language || '';
   if (!raw) return '';
-  return map[raw] || raw;
+  return map[raw] || raw.toUpperCase();
 }
 
-function backfillCountries() {
+function backfillLanguages() {
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) return;
-  const missing = movies.filter(m => m.tmdbId && !m.country).slice(0, 8);
+  const missing = movies.filter(m => m.tmdbId && !m.language).slice(0, 8);
   missing.forEach(m => {
     const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
     fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}&language=en-US`)
       .then(r => r.json())
       .then(data => {
-        const code = countryCode(data, endpoint === 'tv');
-        if (code) { m.country = code; save(); render(); }
+        const code = languageCode(data);
+        if (code) { m.language = code; save(); render(); }
       })
       .catch(() => {});
   });
@@ -55,9 +58,9 @@ function filtered() {
   return movies.filter(m => (m.mediaType || 'movie') === currentMode);
 }
 
-function countryLabel(m) {
-  if (!m || !m.country) return '';
-  return ' (' + m.country + ')';
+function languageLabel(m) {
+  if (!m || !m.language) return '';
+  return ' (' + m.language + ')';
 }
 
 function getViewMode(tabId) {
@@ -194,7 +197,7 @@ function addToTop(id, which) {
 function renderItem(m, view, rank) {
   const title = escapeHtml(m.title || '');
   const titleHtml = `<span>${rank ? rank + '. ' : ''}${title}</span>`;
-  const year = (m.year || '') + countryLabel(m);
+  const year = (m.year || '') + languageLabel(m);
   const rating = m.rating != null ? `<span class="rating">${m.rating}%</span>` : '';
   const folderLabel = m.folder ? `<span class="folder-tag">${escapeHtml(m.folder)}</span>` : '';
   const posterUrl = m.poster ? `https://image.tmdb.org/t/p/w342${m.poster}` : '';
@@ -569,7 +572,7 @@ function movieCard(m, rank) {
         ${poster}
         <div class="movie-info">
           <div class="title">${rank ? rank + '. ' : ''}${escapeHtml(m.title)}${origin}</div>
-          <div class="meta">${(m.year || '') + countryLabel(m)} ${m.genre ? '· ' + m.genre : ''}</div>
+          <div class="meta">${(m.year || '') + languageLabel(m)} ${m.genre ? '· ' + m.genre : ''}</div>
         </div>
         ${rating}
       </div>
@@ -853,7 +856,7 @@ function renderTop10() {
         ${m.poster ? `<img src="https://image.tmdb.org/t/p/w92${m.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
         <div style="flex:1; cursor:pointer;" onclick="showDetails('${m.id}')">
           <div class="title">${escapeHtml(m.title)}</div>
-          <div class="meta">${(m.year || '') + countryLabel(m)} ${m.genre ? '· ' + m.genre : ''}</div>
+          <div class="meta">${(m.year || '') + languageLabel(m)} ${m.genre ? '· ' + m.genre : ''}</div>
         </div>
         <span class="rating">${m.rating}%</span>
         <div class="item-actions" onclick="event.stopPropagation()" style="margin:0;">${libraryButtons(m, i + 1)}</div>
@@ -955,7 +958,7 @@ function renderDecades() {
           ${m.poster ? `<img src="https://image.tmdb.org/t/p/w92${m.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
           <div style="flex:1; cursor:pointer;" onclick="showDetails('${m.id}')">
             <div class="title" >${escapeHtml(m.title)}</div>
-            <div class="meta">${(m.year || '') + countryLabel(m)}</div>
+            <div class="meta">${(m.year || '') + languageLabel(m)}</div>
           </div>
           <span class="rating">${m.rating}%</span>
           <div class="item-actions" onclick="event.stopPropagation()" style="margin:0;">${libraryButtons(m, i + 1)}</div>
@@ -1726,7 +1729,7 @@ function addFromSearchIndex(idx) {
 
   addFromSearch(m.id, title, year, (m.genre_ids || []).join(','), m.overview || '', m.media_type, m.poster_path || '', origin);
   const added = movies[movies.length - 1];
-  if (added && m.details) added.country = countryCode(m.details, isTV);
+  if (added) added.language = languageCode(m.details || m);
 }
 
 function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, posterPath, origin, isFree) {
@@ -1764,13 +1767,13 @@ function addFromSearch(tmdbId, title, year, genreIds, overview, mediaType, poste
     overview: (overview || '').slice(0, 280),
     poster: posterPath || '',
     origin: origin || '',
-    country: '',
+    language: '',
     status: 'watchlist',
     rating: null,
     added: new Date().toISOString()
   });
   save();
-  backfillCountries();
+  backfillLanguages();
   // Update library tabs only — don't re-fetch recommendations or seasonal
   renderList('watchlist', m => m.status === 'watchlist');
   renderList('watching', m => m.status === 'watching');
@@ -2053,7 +2056,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.08</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.09</p>
   `;
 }
 
@@ -2124,7 +2127,7 @@ function startLedger() {
   if (!window.__filmLedgerBooted) {
     window.__filmLedgerBooted = true;
     setTimeout(backfillPosters, 500);
-    setTimeout(backfillCountries, 700);
+    setTimeout(backfillLanguages, 700);
     setTimeout(() => renderRecommendations(1), 800);
   }
   render();
