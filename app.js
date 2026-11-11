@@ -6,6 +6,19 @@ function save() {
   localStorage.setItem('movies', JSON.stringify(movies));
 }
 
+const undoStack = [];
+function pushUndo() {
+  undoStack.push(JSON.stringify(movies));
+  if (undoStack.length > 15) undoStack.shift();
+}
+function undo() {
+  if (!undoStack.length) { showToast('Nothing to undo'); return; }
+  movies = JSON.parse(undoStack.pop());
+  save();
+  render();
+  showToast('Undone');
+}
+
 function setMode(mode) {
   currentMode = mode;
   document.getElementById('btnMovies').classList.toggle('active', mode === 'movie');
@@ -224,7 +237,8 @@ function folderSidebarHtml(scope) {
     const del = count === 0 ? `<span class="folder-del" onclick="event.stopPropagation(); deleteFolder('${safe}')" title="Delete empty folder">×</span>` : '';
     const up = i > 0 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, -1)">▲</span>` : '';
     const down = i < folders.length - 1 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, 1)">▼</span>` : '';
-    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${up}${down}${del}</button>`;
+    const ren = `<span class="folder-move" onclick="event.stopPropagation(); renameFolder('${safe}')" title="Rename">✎</span>`;
+    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${ren}${up}${down}${del}</button>`;
   }).join('');
   return `<aside class="folder-side">
     <div class="folder-head">Folders</div>
@@ -267,10 +281,29 @@ function deleteFolder(name) {
   const used = movies.some(m => m.folder === name);
   if (used) { alert('Folder still has movies. Remove them first.'); return; }
   if (!confirm('Delete folder "' + name + '"?')) return;
+  pushUndo();
   customFolders = customFolders.filter(f => f !== name);
   saveFolders();
   if (watchlistFilters.folder === name) watchlistFilters.folder = '';
   render();
+  showToast('Folder deleted. <button onclick="undo()">Undo</button>');
+}
+
+function renameFolder(name) {
+  const next = prompt('Rename folder:', name);
+  if (next === null) return;
+  const clean = next.trim();
+  if (!clean || clean === name) return;
+  pushUndo();
+  movies.forEach(m => { if (m.folder === name) m.folder = clean; });
+  const idx = customFolders.indexOf(name);
+  if (idx >= 0) customFolders[idx] = clean;
+  else if (!customFolders.includes(clean)) customFolders.push(clean);
+  if (watchlistFilters.folder === name) watchlistFilters.folder = clean;
+  saveFolders();
+  save();
+  render();
+  showToast('Renamed. <button onclick="undo()">Undo</button>');
 }
 
 function assignFolder(id) {
@@ -866,6 +899,21 @@ function moveDecade(id, decade, direction) {
 
 let seasonalPage = 1;
 let recsPage = 1;
+const SEASONS = [
+  ['auto', 'Auto'],
+  ['halloween', 'Halloween'],
+  ['christmas', 'Christmas'],
+  ['valentine', "Valentine's"],
+  ['summer', 'Summer'],
+  ['family', 'Family']
+];
+function seasonalChoice() {
+  return localStorage.getItem('seasonalTheme') || 'auto';
+}
+function setSeasonalTheme(id) {
+  localStorage.setItem('seasonalTheme', id);
+  renderSeasonal(1);
+}
 function renderSeasonal(page = 1) {
   seasonalPage = page;
   const el = document.getElementById('seasonal');
@@ -873,19 +921,25 @@ function renderSeasonal(page = 1) {
   if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings to load seasonal titles.</div>'; return; }
   el.innerHTML = '<div class="empty">Loading seasonal...</div>';
   const month = new Date().getMonth();
-  let genreId = 27, label = 'Halloween';
-  if (month === 11 || month === 0) { genreId = 10749; label = 'Christmas / Romance'; }
-  else if (month >= 5 && month <= 7) { genreId = 12; label = 'Summer / Adventure'; }
-  else if (month === 1) { genreId = 10749; label = "Valentine's"; }
-  else if (month === 10) { genreId = 10751; label = 'Thanksgiving / Family'; }
+  let theme = seasonalChoice();
+  if (theme === 'auto') {
+    if (month === 11 || month === 0) theme = 'christmas';
+    else if (month >= 5 && month <= 7) theme = 'summer';
+    else if (month === 1) theme = 'valentine';
+    else if (month === 10) theme = 'family';
+    else theme = 'halloween';
+  }
+  const map = { halloween: [27, 'Halloween'], christmas: [10749, 'Christmas / Romance'], valentine: [10749, "Valentine's"], summer: [12, 'Summer / Adventure'], family: [10751, 'Family'] };
+  const [genreId, label] = map[theme] || map.halloween;
+  const chips = SEASONS.map(([id, name]) => `<button type="button" class="filter-chip${seasonalChoice()===id?' on':''}" onclick="setSeasonalTheme('${id}')">${name}</button>`).join(' ');
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
   fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
     .then(r => r.json()).then(data => {
-      const results = (data.results || []).slice(0, 10);
+      const results = (data.results || []).slice(0, 20);
       if (!results.length) { el.innerHTML = `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
       const view = getViewMode('seasonal');
-      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="list-container ${view}">` + results.map(m => {
+      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="tab-tools-row">${chips}</div>` + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
         const posterPath = m.poster_path || '';
@@ -901,11 +955,18 @@ function renderSeasonal(page = 1) {
     }).catch(() => el.innerHTML = '<div class="empty">Failed to load seasonal titles.</div>');
 }
 
+function setRecSeed(id) {
+  localStorage.setItem('recSeed', id || '');
+  renderRecommendations(1);
+}
 function renderRecommendations(page = 1) {
   recsPage = page;
   const el = document.getElementById('recs');
-  const highRated = filtered().filter(m => m.rating >= 75 && m.status === 'watched' && m.tmdbId).sort((a, b) => b.rating - a.rating).slice(0, 5);
-  if (!highRated.length) { el.innerHTML = '<div class="empty">Rate a few movies 75%+ to get recommendations.</div>'; return; }
+  const seeds = filtered().filter(m => m.rating >= 75 && m.status === 'watched' && m.tmdbId).sort((a, b) => b.rating - a.rating);
+  const pick = localStorage.getItem('recSeed') || '';
+  const highRated = pick ? seeds.filter(m => m.id === pick).slice(0, 1) : seeds.slice(0, 8);
+  if (!seeds.length) { el.innerHTML = '<div class="empty">Rate a few movies 75%+ to get recommendations.</div>'; return; }
+  if (!highRated.length) { el.innerHTML = '<div class="empty">Pick a seed movie.</div>'; return; }
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings first.</div>'; return; }
   el.innerHTML = '<div class="empty">Loading recommendations...</div>';
@@ -920,7 +981,8 @@ function renderRecommendations(page = 1) {
     }));
     if (!combined.length) { el.innerHTML = '<div class="empty">No new recommendations found.</div>'; return; }
     const view = getViewMode('recs');
-    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `<div class="list-container ${view}">` + combined.slice(0, 10).map(m => {
+    const seedChips = `<button type="button" class="filter-chip${!pick?' on':''}" onclick="setRecSeed('')">All</button>` + seeds.slice(0, 12).map(s => `<button type="button" class="filter-chip${pick===s.id?' on':''}" onclick="setRecSeed('${s.id}')">${escapeHtml(s.title)}</button>`).join('');
+    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `<div class="tab-tools-row">${seedChips}</div>` + `<div class="list-container ${view}">` + combined.slice(0, 20).map(m => {
       const isTV = m.endpoint === 'tv';
       const title = isTV ? m.name : m.title;
       const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -1437,13 +1499,26 @@ function importData(event) {
       const parsed = JSON.parse(e.target.result);
       const list = Array.isArray(parsed) ? parsed : (parsed.movies || parsed.library || parsed.items);
       if (!Array.isArray(list)) throw new Error('No movie list in that file');
-      askConfirm('Replace your current library with this backup? ' + list.length + ' items.', () => {
+      const choice = confirm('Merge into your library?\n\nOK = merge (keep yours, add new)\nCancel = replace everything');
+      pushUndo();
+      if (choice) {
+        const have = new Set(movies.map(m => (m.mediaType || 'movie') + ':' + m.tmdbId));
+        let added = 0;
+        list.forEach(m => {
+          const key = (m.mediaType || 'movie') + ':' + m.tmdbId;
+          if (!have.has(key)) { movies.push(m); have.add(key); added++; }
+        });
+        if (parsed && parsed.tmdbKey && !localStorage.getItem('tmdbKey')) localStorage.setItem('tmdbKey', parsed.tmdbKey);
+        save();
+        render();
+        showToast('Merged ' + added + ' new items. <button onclick="undo()">Undo</button>');
+      } else {
         movies = list;
         if (parsed && parsed.tmdbKey) localStorage.setItem('tmdbKey', parsed.tmdbKey);
         save();
         render();
-        showToast('Imported ' + movies.length + ' items');
-      });
+        showToast('Replaced with ' + movies.length + ' items. <button onclick="undo()">Undo</button>');
+      }
     } catch (err) {
       alert('Could not import: ' + err.message);
     }
@@ -1589,7 +1664,7 @@ function showToast(message) {
     el.className = 'toast';
     document.body.appendChild(el);
   }
-  el.textContent = message;
+  el.innerHTML = message;
   el.classList.add('show');
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove('show'), 2200);
@@ -1672,10 +1747,12 @@ function deleteMovie(id) {
   const m = movies.find(x => x.id === id);
   if (!m) return;
   askConfirm(`Delete "${m.title}" permanently?`, () => {
+    pushUndo();
     movies = movies.filter(x => x.id !== id);
     save();
     document.querySelectorAll('.sheet').forEach(el => el.remove());
     render();
+    showToast('Deleted. <button onclick="undo()">Undo</button>');
   });
 }
 
@@ -1797,7 +1874,7 @@ function renderSettings() {
     </div>
     <div class="backup-box">
       <div class="stat-label" style="margin-bottom:6px;">Library Backup</div>
-      <p class="backup-note">Export saves a JSON file of your whole library — every movie and show, ratings, watched status, favorites, top 10 pins, notes, and your TMDB key. Import replaces the current library with that file.</p>
+      <p class="backup-note">Export saves a JSON file of your whole library — every movie and show, ratings, watched status, favorites, top 10 pins, notes, and your TMDB key. Import asks: merge keeps yours and adds new, or replace everything.</p>
       <div class="backup-actions">
         <button type="button" onclick="exportData()">Export</button>
         <label class="import-label">Import<input type="file" accept="application/json,.json,text/json" onchange="importData(event)"></label>
@@ -1815,7 +1892,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.01</p>
   `;
 }
 
