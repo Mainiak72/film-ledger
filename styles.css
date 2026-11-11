@@ -498,11 +498,19 @@ nav button.active {
   justify-content: center;
 }
 
-.folder-move, .folder-del {
+.least-mark {
+  border: 1px solid var(--accent);
+  background: #1a1408;
+  margin-top: 14px;
+}
+.least-tag {
   color: var(--accent);
-  font-size: 0.75rem;
-  margin-left: 4px;
-  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: 36px;
+  text-align: center;
 }
 
 .folder-pick {

@@ -234,11 +234,7 @@ function folderSidebarHtml(scope) {
     const count = movies.filter(m => m.status === scope && m.folder === f).length;
     const on = active === f ? ' on' : '';
     const safe = escapeHtml(f.replace(/'/g, "\\'"));
-    const del = count === 0 ? `<span class="folder-del" onclick="event.stopPropagation(); deleteFolder('${safe}')" title="Delete empty folder">×</span>` : '';
-    const up = i > 0 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, -1)">▲</span>` : '';
-    const down = i < folders.length - 1 ? `<span class="folder-move" onclick="event.stopPropagation(); moveFolder(${i}, 1)">▼</span>` : '';
-    const ren = `<span class="folder-move" onclick="event.stopPropagation(); renameFolder('${safe}')" title="Rename">✎</span>`;
-    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span>${ren}${up}${down}${del}</button>`;
+    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span><span class="folder-move" onclick="event.stopPropagation(); folderMenu('${safe}', ${i})">⋯</span></button>`;
   }).join('');
   return `<aside class="folder-side">
     <div class="folder-head">Folders</div>
@@ -246,6 +242,39 @@ function folderSidebarHtml(scope) {
     ${items}
     <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ Folder</button>
   </aside>`;
+}
+
+function openMenu(title, items) {
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
+  window._menuItems = items;
+  const modal = document.createElement('div');
+  modal.className = 'sheet';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:320px; width:100%; padding:16px; max-height:80vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1rem; color:#d4af37;">${escapeHtml(title)}</h3>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
+      </div>
+      <div class="folder-pick">
+        ${items.map((it, i) => `<button type="button" class="folder-item" onclick="runMenu(${i})">${escapeHtml(it.label)}</button>`).join('')}
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+function runMenu(i) {
+  const item = (window._menuItems || [])[i];
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
+  if (item && item.fn) item.fn();
+}
+function folderMenu(name, index) {
+  const folders = allFolders();
+  const items = [{ label: 'Rename', fn: () => renameFolder(name) }];
+  if (index > 0) items.push({ label: 'Move up', fn: () => moveFolder(index, -1) });
+  if (index < folders.length - 1) items.push({ label: 'Move down', fn: () => moveFolder(index, 1) });
+  items.push({ label: 'Delete', fn: () => deleteFolder(name) });
+  openMenu(name, items);
 }
 
 function moveFolder(index, dir) {
@@ -782,6 +811,21 @@ function renderTop10() {
       </div>
     `).join('');
   }
+  const worst = filtered()
+    .filter(m => m.rating != null && m.status === 'watched' && !allTime.some(t => t.id === m.id))
+    .sort((a, b) => a.rating - b.rating)[0];
+  if (worst) {
+    html += `<div class="top10-row least-mark">
+      <div class="rank-num">11</div>
+      <div class="least-tag">Least</div>
+      ${worst.poster ? `<img src="https://image.tmdb.org/t/p/w92${worst.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
+      <div style="flex:1; cursor:pointer;" onclick="showDetails('${worst.id}')">
+        <div class="title">${escapeHtml(worst.title)}</div>
+        <div class="meta">Least favorite of all time</div>
+      </div>
+      <span class="rating">${worst.rating}%</span>
+    </div>`;
+  }
   el.innerHTML = html;
 }
 
@@ -931,15 +975,20 @@ function renderSeasonal(page = 1) {
   }
   const map = { halloween: [27, 'Halloween'], christmas: [10749, 'Christmas / Romance'], valentine: [10749, "Valentine's"], summer: [12, 'Summer / Adventure'], family: [10751, 'Family'] };
   const [genreId, label] = map[theme] || map.halloween;
-  const chips = SEASONS.map(([id, name]) => `<button type="button" class="filter-chip${seasonalChoice()===id?' on':''}" onclick="setSeasonalTheme('${id}')">${name}</button>`).join(' ');
+  const decade = localStorage.getItem('seasonalDecade') || 'all';
+  const decadeLabel = decade === 'all' ? 'Any decade' : decade + 's';
+  const menuBtn = `<button type="button" class="folder-move" onclick="seasonalMenu()" style="font-size:1.1rem;">⋯</button>`;
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
-  fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
+  const decadeQ = decade === 'all' ? '' : (endpoint === 'tv'
+    ? `&first_air_date.gte=${decade}-01-01&first_air_date.lte=${Number(decade)+9}-12-31`
+    : `&primary_release_date.gte=${decade}-01-01&primary_release_date.lte=${Number(decade)+9}-12-31`);
+    fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false${decadeQ}`)
     .then(r => r.json()).then(data => {
       const results = (data.results || []).slice(0, 20);
       if (!results.length) { el.innerHTML = `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
       const view = getViewMode('seasonal');
-      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="tab-tools-row">${chips}</div>` + `<div class="list-container ${view}">` + results.map(m => {
+      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="tab-tools-row"><span class="meta">${label} · ${decadeLabel}</span>${menuBtn}</div>` + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
         const posterPath = m.poster_path || '';
@@ -962,11 +1011,11 @@ function setRecSeed(id) {
 function renderRecommendations(page = 1) {
   recsPage = page;
   const el = document.getElementById('recs');
-  const seeds = filtered().filter(m => m.rating >= 75 && m.status === 'watched' && m.tmdbId).sort((a, b) => b.rating - a.rating);
-  const pick = localStorage.getItem('recSeed') || '';
-  const highRated = pick ? seeds.filter(m => m.id === pick).slice(0, 1) : seeds.slice(0, 8);
-  if (!seeds.length) { el.innerHTML = '<div class="empty">Rate a few movies 75%+ to get recommendations.</div>'; return; }
-  if (!highRated.length) { el.innerHTML = '<div class="empty">Pick a seed movie.</div>'; return; }
+  const seeds = buildTop(filtered(), 'pinAllTime').filter(m => m.tmdbId);
+  if (!seeds.length) { el.innerHTML = '<div class="empty">Add a Top 10 movie to get recommendations.</div>'; return; }
+  const pick = localStorage.getItem('recSeed') || seeds[0].id;
+  const highRated = seeds.filter(m => m.id === pick).slice(0, 1);
+  if (!highRated.length) { el.innerHTML = '<div class="empty">Pick a Top 10 movie.</div>'; return; }
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings first.</div>'; return; }
   el.innerHTML = '<div class="empty">Loading recommendations...</div>';
@@ -981,8 +1030,14 @@ function renderRecommendations(page = 1) {
     }));
     if (!combined.length) { el.innerHTML = '<div class="empty">No new recommendations found.</div>'; return; }
     const view = getViewMode('recs');
-    const seedChips = `<button type="button" class="filter-chip${!pick?' on':''}" onclick="setRecSeed('')">All</button>` + seeds.slice(0, 12).map(s => `<button type="button" class="filter-chip${pick===s.id?' on':''}" onclick="setRecSeed('${s.id}')">${escapeHtml(s.title)}</button>`).join('');
-    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `<div class="tab-tools-row">${seedChips}</div>` + `<div class="list-container ${view}">` + combined.slice(0, 20).map(m => {
+    const seed = highRated[0];
+    const decade = localStorage.getItem('recDecade') || 'all';
+    const decadeLabel = decade === 'all' ? 'Any decade' : decade + 's';
+    const filteredCombined = decade === 'all' ? combined : combined.filter(m => {
+      const y = Number(((m.endpoint === 'tv' ? m.first_air_date : m.release_date) || '').slice(0, 4));
+      return y >= Number(decade) && y <= Number(decade) + 9;
+    });
+    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `<div class="tab-tools-row"><span class="meta">Based on ${escapeHtml(seed.title)} · ${decadeLabel}</span><button type="button" class="folder-move" onclick="recsMenu()" style="font-size:1.1rem;">⋯</button></div>` + `<div class="list-container ${view}">` + filteredCombined.slice(0, 20).map(m => {
       const isTV = m.endpoint === 'tv';
       const title = isTV ? m.name : m.title;
       const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -995,6 +1050,24 @@ function renderRecommendations(page = 1) {
       return `<div class="card" style="display:flex; align-items:center; padding:8px;"><div style="display:flex; align-items:center; cursor:pointer; flex:1;" onclick="showSearchDetails(${m.id}, '${m.endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}</div><div class="meta">${year}</div></div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>`;
     }).join('') + '</div>';
   });
+}
+
+function seasonalMenu() {
+  const items = SEASONS.map(([id, name]) => ({ label: name, fn: () => setSeasonalTheme(id) }));
+  items.push({ label: '— Decade —', fn: () => {} });
+  ['all', '2020', '2010', '2000', '1990', '1980', '1970', '1960', '1950', '1940'].forEach(d => {
+    items.push({ label: d === 'all' ? 'Any decade' : d + 's', fn: () => { localStorage.setItem('seasonalDecade', d); renderSeasonal(1); } });
+  });
+  openMenu('Seasonal', items);
+}
+function recsMenu() {
+  const seeds = buildTop(filtered(), 'pinAllTime').filter(m => m.tmdbId);
+  const items = seeds.map(s => ({ label: s.title, fn: () => setRecSeed(s.id) }));
+  items.push({ label: '— Decade —', fn: () => {} });
+  ['all', '2020', '2010', '2000', '1990', '1980', '1970', '1960', '1950', '1940'].forEach(d => {
+    items.push({ label: d === 'all' ? 'Any decade' : d + 's', fn: () => { localStorage.setItem('recDecade', d); renderRecommendations(1); } });
+  });
+  openMenu('Recommended', items);
 }
 
 function onSearchInput() {
@@ -1829,7 +1902,6 @@ const ALL_TABS = [
   ['seasonal', 'Seasonal'],
   ['top10', 'Top 10'],
   ['decades', 'Decades'],
-  ['least', 'Least'],
   ['stats', 'Stats'],
   ['settings', 'Settings']
 ];
@@ -1892,7 +1964,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.01</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.02</p>
   `;
 }
 
