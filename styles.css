@@ -356,7 +356,8 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 4px 0 6px;
   position: sticky;
   top: 0;
@@ -365,8 +366,14 @@ button:hover {
   z-index: 2;
 }
 
+.page-bar button.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
 .page-bar button {
-  padding: 6px 16px;
+  padding: 6px 10px;
   font-size: 0.8rem;
 }
 

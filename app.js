@@ -234,10 +234,10 @@ function folderSidebarHtml(scope) {
     const count = movies.filter(m => m.status === scope && m.folder === f).length;
     const on = active === f ? ' on' : '';
     const safe = escapeHtml(f.replace(/'/g, "\\'"));
-    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span><span class="folder-move" onclick="event.stopPropagation(); folderMenu('${safe}', ${i})">⋯</span></button>`;
+    return `<button type="button" class="folder-item${on}" onclick="setFolder('${safe}', '${scope}')">${escapeHtml(f)} <span class="folder-count">${count}</span><span class="folder-move" onclick="event.stopPropagation(); folderMenu('${safe}')">⋯</span></button>`;
   }).join('');
   return `<aside class="folder-side">
-    <div class="folder-head">Folders</div>
+    <div class="folder-head">Folders <span class="folder-move" onclick="reorderFolders()">⋯</span></div>
     <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setFolder('', '${scope}')">All</button>
     ${items}
     <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ Folder</button>
@@ -265,13 +265,38 @@ function runMenu(i) {
   document.querySelectorAll('.sheet').forEach(el => el.remove());
   if (item && item.fn) item.fn();
 }
-function folderMenu(name, index) {
+function folderMenu(name) {
+  openMenu(name, [
+    { label: 'Rename', fn: () => renameFolder(name) },
+    { label: 'Delete', fn: () => deleteFolder(name) }
+  ]);
+}
+
+function reorderFolders() {
   const folders = allFolders();
-  const items = [{ label: 'Rename', fn: () => renameFolder(name) }];
-  if (index > 0) items.push({ label: 'Move up', fn: () => moveFolder(index, -1) });
-  if (index < folders.length - 1) items.push({ label: 'Move down', fn: () => moveFolder(index, 1) });
-  items.push({ label: 'Delete', fn: () => deleteFolder(name) });
-  openMenu(name, items);
+  if (folders.length < 2) { showToast('Need two folders to reorder'); return; }
+  document.querySelectorAll('.sheet').forEach(el => el.remove());
+  const modal = document.createElement('div');
+  modal.className = 'sheet';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  const rows = folders.map((f, i) => `
+    <div class="folder-item">
+      <span>${escapeHtml(f)}</span>
+      <span>
+        ${i > 0 ? `<span class="folder-move" onclick="moveFolder(${i}, -1); reorderFolders()">▲</span>` : ''}
+        ${i < folders.length - 1 ? `<span class="folder-move" onclick="moveFolder(${i}, 1); reorderFolders()">▼</span>` : ''}
+      </span>
+    </div>`).join('');
+  modal.innerHTML = `
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:10px; max-width:260px; width:100%; padding:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3 style="font-size:1rem; color:#d4af37;">Order</h3>
+        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.3rem;">×</button>
+      </div>
+      <div class="folder-pick">${rows}</div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
 
 function moveFolder(index, dir) {
@@ -1364,7 +1389,10 @@ function doPersonSearch(query, apiKey, resultsEl) {
 
 function pageBar(page, total) {
   if (total <= 1) return '';
-  return `<div class="page-bar">${page > 1 ? `<button type="button" onclick="searchMovies(${page - 1})">Prev</button>` : '<span></span>'}<button type="button" onclick="searchMovies(${page + 1})">Next</button></div>`;
+  const pages = [];
+  for (let i = 1; i <= total; i++) pages.push(i);
+  const buttons = pages.map(p => `<button type="button" class="${p === page ? 'on' : ''}" onclick="searchMovies(${p})">${p}</button>`).join('');
+  return `<div class="page-bar">${buttons}</div>`;
 }
 
 function clearSearch() {
@@ -1985,7 +2013,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.05</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.06</p>
   `;
 }
 
