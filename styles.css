@@ -366,7 +366,31 @@ button:hover {
   z-index: 2;
 }
 
-.page-bar button,
+.search-box-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.search-box {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-box span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .page-num {
   background: none;
   border: none;
@@ -745,7 +769,8 @@ nav button.active {
 
 .view-toggle {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   background: var(--surface);
   padding: 3px;
   border-radius: 10px;
@@ -753,20 +778,26 @@ nav button.active {
 }
 
 .view-toggle button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: var(--muted);
-  padding: 5px 10px;
+  width: 34px;
+  height: 30px;
+  padding: 0;
   border-radius: 7px;
-  font-size: 0.7rem;
+  font-size: 0.95rem;
+  line-height: 1;
   font-weight: 500;
 }
 
 .view-toggle button.active {
   background: transparent;
   color: var(--accent);
-  font-size: 0.9rem;
   font-weight: 700;
+  transform: scale(1.12);
 }
 
 .free-filters { margin-top: 12px; }

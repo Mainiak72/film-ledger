@@ -1070,6 +1070,7 @@ function renderSeasonal(page = 1) {
 
 function setRecSeed(id) {
   localStorage.setItem('recSeed', id || '');
+  window._recsCache = null;
   renderRecommendations(1);
 }
 function renderRecommendations(page = 1) {
@@ -1080,55 +1081,82 @@ function renderRecommendations(page = 1) {
   const allSeeds = [...seeds, ...watched];
   if (!allSeeds.length) { el.innerHTML = '<div class="empty">Rate a watched movie to get recommendations.</div>'; return; }
   const pick = localStorage.getItem('recSeed') || seeds[0]?.id || allSeeds[0].id;
-  const highRated = allSeeds.filter(m => m.id === pick).slice(0, 1);
-  if (!highRated.length) { el.innerHTML = '<div class="empty">Pick a Top 10 movie.</div>'; return; }
+  const seed = allSeeds.find(m => m.id === pick) || allSeeds[0];
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings first.</div>'; return; }
+  const decade = localStorage.getItem('recDecade') || 'all';
+  const cacheKey = seed.id + '|' + decade;
+  if (window._recsCache && window._recsCache.key === cacheKey) {
+    paintRecommendations(el, window._recsCache.items, page, seed, seeds, watched, pick, decade);
+    return;
+  }
   el.innerHTML = '<div class="empty">Loading recommendations...</div>';
-  Promise.all(highRated.map(seed => {
-    const endpoint = seed.mediaType === 'tv' ? 'tv' : 'movie';
-    return fetch(`https://api.themoviedb.org/3/${endpoint}/${seed.tmdbId}/recommendations?api_key=${apiKey}&language=en-US&page=${page}`).then(r => r.json()).then(data => ({ results: data.results || [], endpoint })).catch(() => ({ results: [], endpoint }));
-  })).then(all => {
-    const seen = new Set(), combined = [];
-    all.forEach(group => group.results.forEach(m => {
-      const key = group.endpoint + '-' + m.id;
-      if (!seen.has(key) && !movies.some(x => x.tmdbId === m.id && (x.mediaType || 'movie') === group.endpoint)) { seen.add(key); combined.push({ ...m, endpoint: group.endpoint }); }
-    }));
-    if (!combined.length) { el.innerHTML = '<div class="empty">No new recommendations found.</div>'; return; }
-    const view = getViewMode('recs');
-    const seed = highRated[0];
-    const decade = localStorage.getItem('recDecade') || 'all';
-    const decadeLabel = decade === 'all' ? 'Any decade' : decade + 's';
+  const endpoint = seed.mediaType === 'tv' ? 'tv' : 'movie';
+  const genreIds = genreIdsFromText(seed.genre);
+  const jobs = [];
+  for (let p = 1; p <= 5; p++) {
+    jobs.push(fetch(`https://api.themoviedb.org/3/${endpoint}/${seed.tmdbId}/recommendations?api_key=${apiKey}&language=en-US&page=${p}`).then(r => r.json()).then(d => (d.results || []).map(m => ({ ...m, endpoint }))).catch(() => []));
+    jobs.push(fetch(`https://api.themoviedb.org/3/${endpoint}/${seed.tmdbId}/similar?api_key=${apiKey}&language=en-US&page=${p}`).then(r => r.json()).then(d => (d.results || []).map(m => ({ ...m, endpoint }))).catch(() => []));
+  }
+  if (genreIds) {
+    const dateQ = decade === 'all' ? '' : `&primary_release_date.gte=${decade}-01-01&primary_release_date.lte=${Number(decade) + 9}-12-31`;
+    for (let p = 1; p <= 5; p++) {
+      jobs.push(fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreIds}&language=en-US&page=${p}&sort_by=popularity.desc&include_adult=false${dateQ}`).then(r => r.json()).then(d => (d.results || []).map(m => ({ ...m, endpoint }))).catch(() => []));
+    }
+  }
+  Promise.all(jobs).then(groups => {
+    const seen = new Set();
+    const combined = [];
+    groups.flat().forEach(m => {
+      const key = m.endpoint + '-' + m.id;
+      if (seen.has(key) || movies.some(x => x.tmdbId === m.id && (x.mediaType || 'movie') === m.endpoint)) return;
+      seen.add(key);
+      combined.push(m);
+    });
     const filteredCombined = decade === 'all' ? combined : combined.filter(m => {
       const y = Number(((m.endpoint === 'tv' ? m.first_air_date : m.release_date) || '').slice(0, 4));
       return y >= Number(decade) && y <= Number(decade) + 9;
     });
-    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `
-      <div class="pick-row">
-        <label>Based on
-          <select onchange="setRecSeed(this.value)">
-            <optgroup label="Top 10">${seeds.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}</optgroup>
-            ${watched.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}
-          </select>
-        </label>
-        <label>Decade
-          <select onchange="localStorage.setItem('recDecade', this.value); renderRecommendations(1)">
-            ${['all','2020','2010','2000','1990','1980','1970','1960','1950','1940'].map(d => `<option value="${d}" ${decade===d?'selected':''}>${d==='all'?'Any':d+'s'}</option>`).join('')}
-          </select>
-        </label>
-      </div>` + `<div class="list-container ${view}">` + filteredCombined.slice(0, 20).map(m => {
-      const isTV = m.endpoint === 'tv';
-      const title = isTV ? m.name : m.title;
-      const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
-      const posterPath = m.poster_path || '';
-      const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
-      const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
-      const addBtn = `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${m.endpoint}', '${posterPath}', 'streaming')">Add</button>`;
-      if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${m.endpoint}')"><span class="bullet-title">${escapeHtml(title)}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
-      if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${m.endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}</div></div>`;
-      return `<div class="card" style="display:flex; align-items:center; padding:8px;"><div style="display:flex; align-items:center; cursor:pointer; flex:1;" onclick="showSearchDetails(${m.id}, '${m.endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}</div><div class="meta">${year}</div></div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>`;
-    }).join('') + '</div>';
+    window._recsCache = { key: cacheKey, items: filteredCombined };
+    paintRecommendations(el, filteredCombined, page, seed, seeds, watched, pick, decade);
   });
+}
+
+function paintRecommendations(el, items, page, seed, seeds, watched, pick, decade) {
+  const view = getViewMode('recs');
+  const per = 20;
+  const total = Math.max(1, Math.ceil(items.length / per));
+  const pageItems = items.slice((page - 1) * per, page * per);
+  const bar = pageBar(page, total, 'renderRecommendations');
+  const cards = pageItems.map(m => {
+    const isTV = m.endpoint === 'tv';
+    const title = isTV ? m.name : m.title;
+    const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
+    const posterPath = m.poster_path || '';
+    const poster = posterPath ? `<img src="https://image.tmdb.org/t/p/w342${posterPath}" class="poster">` : '<div class="poster poster-placeholder"></div>';
+    const small = posterPath ? `<img src="https://image.tmdb.org/t/p/w92${posterPath}" style="width:36px; height:54px; border-radius:4px; object-fit:cover; margin-right:8px;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px; margin-right:8px;"></div>';
+    const addBtn = `<button onclick="addFromSearch(${m.id}, '${jsArg(title)}', '${year}', '', '', '${m.endpoint}', '${posterPath}', 'streaming')">Add</button>`;
+    if (view === 'bullet') return `<div class="bullet-item" onclick="showSearchDetails(${m.id}, '${m.endpoint}')"><span class="bullet-title">${escapeHtml(title)}</span><span class="bullet-actions" onclick="event.stopPropagation()">${addBtn}</span></div>`;
+    if (view === 'large') return `<div class="poster-card"><div onclick="showSearchDetails(${m.id}, '${m.endpoint}')" style="cursor:pointer;">${poster}<div class="poster-title">${escapeHtml(title)}</div><div class="poster-meta">${year}</div></div><div class="poster-actions">${addBtn}</div></div>`;
+    return `<div class="card" style="display:flex; align-items:center; padding:8px;"><div style="display:flex; align-items:center; cursor:pointer; flex:1;" onclick="showSearchDetails(${m.id}, '${m.endpoint}')">${small}<div style="flex:1;"><div class="title">${escapeHtml(title)}</div><div class="meta">${year}</div></div></div><div onclick="event.stopPropagation()">${addBtn}</div></div>`;
+  }).join('');
+  el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `
+    <div class="pick-row">
+      <label>Based on
+        <select onchange="setRecSeed(this.value)">
+          <optgroup label="Top 10">${seeds.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}</optgroup>
+          ${watched.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}
+        </select>
+      </label>
+      <label>Decade
+        <select onchange="localStorage.setItem('recDecade', this.value); window._recsCache=null; renderRecommendations(1)">
+          ${['all','2020','2010','2000','1990','1980','1970','1960','1950','1940'].map(d => `<option value="${d}" ${decade===d?'selected':''}>${d==='all'?'Any':d+'s'}</option>`).join('')}
+        </select>
+      </label>
+    </div>
+    ${items.length ? bar : ''}
+    <div class="list-container ${view}">${cards || '<div class="empty">No recommendations for that decade.</div>'}</div>
+    ${items.length ? bar : ''}`;
 }
 
 function seasonalMenu() {
@@ -1420,15 +1448,16 @@ function doPersonSearch(query, apiKey, resultsEl) {
 }
 
 
-function pageBar(page, total) {
+function pageBar(page, total, fn) {
   if (total <= 1) return '';
+  const call = fn || 'searchMovies';
   const show = new Set([1, 2, 3, total - 1, total, page, page - 1, page + 1]);
   const nums = [...show].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
   let html = '';
   let prev = 0;
   nums.forEach(n => {
     if (prev && n - prev > 1) html += '<span>…</span>';
-    html += `<button type="button" class="page-num${n === page ? ' on' : ''}" onclick="searchMovies(${n})">${n}</button>`;
+    html += `<button type="button" class="page-num${n === page ? ' on' : ''}" onclick="${call}(${n})">${n}</button>`;
     prev = n;
   });
   return `<div class="page-bar">${html}</div>`;
@@ -1440,38 +1469,122 @@ function clearSearch() {
   document.getElementById('searchResults').innerHTML = '';
 }
 
+const GENRE_IDS = {
+  action: 28, adventure: 12, animation: 16, comedy: 35, crime: 80,
+  documentary: 99, drama: 18, family: 10751, fantasy: 14, history: 36,
+  horror: 27, music: 10402, mystery: 9648, romance: 10749,
+  'sci-fi': 878, 'science fiction': 878, scifi: 878,
+  thriller: 53, war: 10752, western: 37
+};
+
+function genreIdsFromText(text) {
+  const names = String(text || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  const ids = names.map(n => GENRE_IDS[n]).filter(Boolean);
+  return ids.length ? ids.join(',') : '';
+}
+
+function matchGenre(query) {
+  const q = query.toLowerCase().trim();
+  if (GENRE_IDS[q]) return { name: q.replace(/\b\w/g, c => c.toUpperCase()), id: GENRE_IDS[q] };
+  return null;
+}
+
 function doTitleSearch(query, page, apiKey, resultsEl, tried = []) {
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   window._lastSearch = { query, page };
-  fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`)
-    .then(r => r.json().then(data => ({ ok: r.ok, data })))
-    .then(({ ok, data }) => {
-      if (!ok || data.status_code) {
-        const msg = data.status_message || 'TMDB rejected the key';
-        resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(msg) + '. Check the API key in Settings.</div>';
-        return;
-      }
-      const hits = (data.results || []).slice(0, 7);
-      if (!hits.length) {
-        resultsEl.innerHTML = '<div class="empty">No results for "' + escapeHtml(query) + '".</div>';
-        return;
-      }
-      window.lastSearchResults = hits;
-      const totalPages = data.total_pages || 1;
-      const view = getViewMode('search');
-      const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
-      const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
-      resultsEl.innerHTML = `
-        <div class="tab-tools-row" style="justify-content:space-between;">
-          ${viewToggle('search')}
-          <button type="button" onclick="clearSearch()">Done</button>
-        </div>
-        ${bar}
-        <div class="list-container ${view}">${items}</div>
-        ${bar}
-      `;
-    })
-    .catch(err => resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(String(err)) + '</div>');
+  const genre = matchGenre(query);
+  const personP = fetch(`https://api.themoviedb.org/3/search/person?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=1`).then(r => r.json()).then(d => (d.results || [])[0]).catch(() => null);
+  const companyP = fetch(`https://api.themoviedb.org/3/search/company?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&page=1`).then(r => r.json()).then(d => (d.results || [])[0]).catch(() => null);
+  const titlesP = fetch(`https://api.themoviedb.org/3/search/${endpoint}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&language=en-US&page=${page}`).then(r => r.json().then(data => ({ ok: r.ok, data }))).catch(err => ({ ok: false, data: { status_message: String(err) } }));
+  Promise.all([personP, companyP, titlesP]).then(([person, company, titleRes]) => {
+    if (!titleRes.ok || titleRes.data.status_code) {
+      resultsEl.innerHTML = '<div class="empty">Search failed: ' + escapeHtml(titleRes.data.status_message || 'TMDB rejected the key') + '. Check the API key in Settings.</div>';
+      return;
+    }
+    const hits = (titleRes.data.results || []).slice(0, 7);
+    window.lastSearchResults = hits;
+    window._searchBoxes = { person, company, genre };
+    const boxes = searchBoxesHtml(query, genre, person, company);
+    const totalPages = titleRes.data.total_pages || 1;
+    const view = getViewMode('search');
+    const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
+    const bar = totalPages > 1 ? pageBar(page, totalPages) : '';
+    resultsEl.innerHTML = `
+      ${boxes}
+      <div class="tab-tools-row" style="justify-content:space-between;">
+        ${viewToggle('search')}
+        <button type="button" onclick="clearSearch()">Done</button>
+      </div>
+      ${bar}
+      <div class="list-container ${view}">${items || '<div class="empty">No title matches.</div>'}</div>
+      ${bar}
+    `;
+  });
+}
+
+function searchBoxesHtml(query, genre, person, company) {
+  const boxes = [];
+  if (genre) boxes.push(`<button type="button" class="search-box" onclick="showGenreResults(${genre.id}, '${jsArg(genre.name)}')"><span>Genre</span>${escapeHtml(genre.name)}</button>`);
+  if (person && person.name && person.name.toLowerCase().includes(query.toLowerCase().slice(0, 4))) {
+    boxes.push(`<button type="button" class="search-box" onclick="openPersonBox()"><span>${escapeHtml(person.known_for_department || 'Person')}</span>${escapeHtml(person.name)}</button>`);
+  }
+  if (company && company.name && company.name.toLowerCase().includes(query.toLowerCase().slice(0, 4))) {
+    boxes.push(`<button type="button" class="search-box" onclick="showCompanyResults(${company.id}, '${jsArg(company.name)}')"><span>Studio</span>${escapeHtml(company.name)}</button>`);
+  }
+  return boxes.length ? `<div class="search-box-row">${boxes.join('')}</div>` : '';
+}
+
+function openPersonBox() {
+  const person = window._searchBoxes && window._searchBoxes.person;
+  if (!person) return;
+  showPersonCredits(person, localStorage.getItem('tmdbKey') || '', document.getElementById('searchResults'), person.name);
+}
+
+function showGenreResults(genreId, name, page = 1) {
+  const apiKey = localStorage.getItem('tmdbKey') || '';
+  const resultsEl = document.getElementById('searchResults');
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  window._discover = { type: 'genre', genreId, name };
+  resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
+  fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_genres=${genreId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
+    .then(r => r.json())
+    .then(data => paintDiscover(resultsEl, data, endpoint, name, page))
+    .catch(() => resultsEl.innerHTML = '<div class="empty">Failed to load genre.</div>');
+}
+
+function showCompanyResults(companyId, name, page = 1) {
+  const apiKey = localStorage.getItem('tmdbKey') || '';
+  const resultsEl = document.getElementById('searchResults');
+  const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
+  window._discover = { type: 'company', companyId, name };
+  resultsEl.innerHTML = '<div class="empty">Loading ' + escapeHtml(name) + '...</div>';
+  fetch(`https://api.themoviedb.org/3/discover/${endpoint}?api_key=${apiKey}&with_companies=${companyId}&language=en-US&page=${page}&sort_by=popularity.desc&include_adult=false`)
+    .then(r => r.json())
+    .then(data => paintDiscover(resultsEl, data, endpoint, name, page))
+    .catch(() => resultsEl.innerHTML = '<div class="empty">Failed to load studio.</div>');
+}
+
+function discoverPage(n) {
+  const d = window._discover || {};
+  if (d.type === 'company') showCompanyResults(d.companyId, d.name, n);
+  else showGenreResults(d.genreId, d.name, n);
+}
+
+function paintDiscover(resultsEl, data, endpoint, label, page) {
+  const hits = data.results || [];
+  window.lastSearchResults = hits;
+  const view = getViewMode('search');
+  const items = hits.map((m, idx) => renderSearchItem(m, idx, endpoint, view)).join('');
+  const total = data.total_pages || 1;
+  const bar = pageBar(page, Math.min(total, 50), 'discoverPage');
+  resultsEl.innerHTML = `
+    <div class="search-box-row"><button type="button" class="search-box" onclick="searchMovies()"><span>Back</span>Search</button></div>
+    <div class="tab-tools-row" style="justify-content:space-between;">${viewToggle('search')}<button type="button" onclick="clearSearch()">Done</button></div>
+    <div class="meta" style="margin-bottom:8px;">${escapeHtml(label)}</div>
+    ${bar}
+    <div class="list-container ${view}">${items || '<div class="empty">Nothing here.</div>'}</div>
+    ${bar}
+  `;
 }
 
 function renderSearchItem(m, idx, endpoint, view) {
@@ -2056,7 +2169,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.16</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.17</p>
   `;
 }
 
