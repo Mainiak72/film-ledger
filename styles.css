@@ -709,8 +709,10 @@ nav button.active {
 }
 
 .view-toggle button.active {
-  background: var(--accent);
-  color: #1a1408;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .free-filters { margin-bottom: 10px; }

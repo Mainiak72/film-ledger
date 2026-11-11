@@ -283,7 +283,6 @@ function assignFolder(id) {
     const on = m.folder === f ? ' on' : '';
     return `<button type="button" class="folder-item${on}" onclick="setMovieFolder('${m.id}', '${safe}')">${escapeHtml(f)}</button>`;
   }).join('');
-  const none = `<button type="button" class="folder-item${m.folder ? '' : ' on'}" onclick="setMovieFolder('${m.id}', '')">None</button>`;
   const modal = document.createElement('div');
   modal.className = 'sheet';
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
@@ -294,7 +293,6 @@ function assignFolder(id) {
         <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
       </div>
       <div class="folder-pick">
-        ${none}
         ${options}
         <button type="button" class="folder-add" onclick="createFolderAndAssign('${m.id}')">+ Folder</button>
       </div>
@@ -1817,7 +1815,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v5.140</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6</p>
   `;
 }
 
