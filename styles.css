@@ -366,15 +366,20 @@ button:hover {
   z-index: 2;
 }
 
-.page-bar button.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  font-weight: 700;
+.page-bar button,
+.page-num {
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
-.page-bar button {
-  padding: 6px 10px;
-  font-size: 0.8rem;
+.page-bar button.on,
+.page-num.on {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .page-bar span {

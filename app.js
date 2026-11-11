@@ -1389,10 +1389,16 @@ function doPersonSearch(query, apiKey, resultsEl) {
 
 function pageBar(page, total) {
   if (total <= 1) return '';
-  const pages = [];
-  for (let i = 1; i <= total; i++) pages.push(i);
-  const buttons = pages.map(p => `<button type="button" class="${p === page ? 'on' : ''}" onclick="searchMovies(${p})">${p}</button>`).join('');
-  return `<div class="page-bar">${buttons}</div>`;
+  const show = new Set([1, 2, 3, total - 1, total, page, page - 1, page + 1]);
+  const nums = [...show].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+  let html = '';
+  let prev = 0;
+  nums.forEach(n => {
+    if (prev && n - prev > 1) html += '<span>…</span>';
+    html += `<button type="button" class="page-num${n === page ? ' on' : ''}" onclick="searchMovies(${n})">${n}</button>`;
+    prev = n;
+  });
+  return `<div class="page-bar">${html}</div>`;
 }
 
 function clearSearch() {
@@ -2013,7 +2019,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.06</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.07</p>
   `;
 }
 
