@@ -251,11 +251,7 @@ function openMenu(title, items) {
   modal.className = 'sheet';
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
   modal.innerHTML = `
-    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:12px; max-width:320px; width:100%; padding:16px; max-height:80vh; overflow-y:auto;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <h3 style="font-size:1rem; color:#d4af37;">${escapeHtml(title)}</h3>
-        <button type="button" onclick="this.closest('.sheet').remove()" style="background:none; border:none; color:#a89880; font-size:1.4rem; cursor:pointer;">×</button>
-      </div>
+    <div style="background:#1a1714; border:1px solid #2e2820; border-radius:10px; max-width:240px; width:100%; padding:10px;">
       <div class="folder-pick">
         ${items.map((it, i) => `<button type="button" class="folder-item" onclick="runMenu(${i})">${escapeHtml(it.label)}</button>`).join('')}
       </div>
@@ -977,7 +973,19 @@ function renderSeasonal(page = 1) {
   const [genreId, label] = map[theme] || map.halloween;
   const decade = localStorage.getItem('seasonalDecade') || 'all';
   const decadeLabel = decade === 'all' ? 'Any decade' : decade + 's';
-  const menuBtn = `<button type="button" class="folder-move" onclick="seasonalMenu()" style="font-size:1.1rem;">⋯</button>`;
+  const menuBtn = '';
+  const seasonPick = `<div class="pick-row">
+    <label>Season
+      <select onchange="setSeasonalTheme(this.value)">
+        ${SEASONS.map(([id, name]) => `<option value="${id}" ${seasonalChoice()===id?'selected':''}>${name}</option>`).join('')}
+      </select>
+    </label>
+    <label>Decade
+      <select onchange="localStorage.setItem('seasonalDecade', this.value); renderSeasonal(1)">
+        ${['all','2020','2010','2000','1990','1980','1970','1960','1950','1940'].map(d => `<option value="${d}" ${decade===d?'selected':''}>${d==='all'?'Any':d+'s'}</option>`).join('')}
+      </select>
+    </label>
+  </div>`;
   const endpoint = currentMode === 'tv' ? 'tv' : 'movie';
   const typeLabel = currentMode === 'tv' ? 'TV Shows' : 'Movies';
   const decadeQ = decade === 'all' ? '' : (endpoint === 'tv'
@@ -988,7 +996,7 @@ function renderSeasonal(page = 1) {
       const results = (data.results || []).slice(0, 20);
       if (!results.length) { el.innerHTML = `<div class="empty">No ${label} ${typeLabel.toLowerCase()} found.</div>`; return; }
       const view = getViewMode('seasonal');
-      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + `<div class="tab-tools-row"><span class="meta">${label} · ${decadeLabel}</span>${menuBtn}</div>` + `<div class="list-container ${view}">` + results.map(m => {
+      el.innerHTML = tabHead(`<h3>${label} ${typeLabel}</h3>`, 'seasonal', 'seasonal') + seasonPick + `<div class="list-container ${view}">` + results.map(m => {
         const title = endpoint === 'tv' ? m.name : m.title;
         const year = endpoint === 'tv' ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
         const posterPath = m.poster_path || '';
@@ -1012,9 +1020,11 @@ function renderRecommendations(page = 1) {
   recsPage = page;
   const el = document.getElementById('recs');
   const seeds = buildTop(filtered(), 'pinAllTime').filter(m => m.tmdbId);
-  if (!seeds.length) { el.innerHTML = '<div class="empty">Add a Top 10 movie to get recommendations.</div>'; return; }
-  const pick = localStorage.getItem('recSeed') || seeds[0].id;
-  const highRated = seeds.filter(m => m.id === pick).slice(0, 1);
+  const watched = filtered().filter(m => m.status === 'watched' && m.tmdbId && !seeds.some(s => s.id === m.id)).sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 20);
+  const allSeeds = [...seeds, ...watched];
+  if (!allSeeds.length) { el.innerHTML = '<div class="empty">Rate a watched movie to get recommendations.</div>'; return; }
+  const pick = localStorage.getItem('recSeed') || seeds[0]?.id || allSeeds[0].id;
+  const highRated = allSeeds.filter(m => m.id === pick).slice(0, 1);
   if (!highRated.length) { el.innerHTML = '<div class="empty">Pick a Top 10 movie.</div>'; return; }
   const apiKey = localStorage.getItem('tmdbKey');
   if (!apiKey) { el.innerHTML = '<div class="empty">Add your TMDB API key in Settings first.</div>'; return; }
@@ -1037,7 +1047,20 @@ function renderRecommendations(page = 1) {
       const y = Number(((m.endpoint === 'tv' ? m.first_air_date : m.release_date) || '').slice(0, 4));
       return y >= Number(decade) && y <= Number(decade) + 9;
     });
-    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `<div class="tab-tools-row"><span class="meta">Based on ${escapeHtml(seed.title)} · ${decadeLabel}</span><button type="button" class="folder-move" onclick="recsMenu()" style="font-size:1.1rem;">⋯</button></div>` + `<div class="list-container ${view}">` + filteredCombined.slice(0, 20).map(m => {
+    el.innerHTML = tabHead('<h3>Recommended</h3>', 'recs', 'recs') + `
+      <div class="pick-row">
+        <label>Based on
+          <select onchange="setRecSeed(this.value)">
+            <optgroup label="Top 10">${seeds.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}</optgroup>
+            ${watched.map(s => `<option value="${s.id}" ${pick===s.id?'selected':''}>${escapeHtml(s.title)}</option>`).join('')}
+          </select>
+        </label>
+        <label>Decade
+          <select onchange="localStorage.setItem('recDecade', this.value); renderRecommendations(1)">
+            ${['all','2020','2010','2000','1990','1980','1970','1960','1950','1940'].map(d => `<option value="${d}" ${decade===d?'selected':''}>${d==='all'?'Any':d+'s'}</option>`).join('')}
+          </select>
+        </label>
+      </div>` + `<div class="list-container ${view}">` + filteredCombined.slice(0, 20).map(m => {
       const isTV = m.endpoint === 'tv';
       const title = isTV ? m.name : m.title;
       const year = isTV ? (m.first_air_date || '').slice(0, 4) : (m.release_date || '').slice(0, 4);
@@ -1964,7 +1987,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.03</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.04</p>
   `;
 }
 
