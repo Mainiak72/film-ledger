@@ -24,7 +24,7 @@ function backfillLanguages() {
       .then(r => r.json())
       .then(data => {
         const code = languageCode(data);
-        if (code) { m.language = code; save(); render(); }
+        if (code) { m.language = code; save(); renderList('watchlist', x => x.status === 'watchlist'); renderList('watching', x => x.status === 'watching'); renderAllTime(); }
       })
       .catch(() => {});
   });
@@ -867,13 +867,14 @@ function renderTop10() {
     .filter(m => m.rating != null && m.status === 'watched' && !allTime.some(t => t.id === m.id))
     .sort((a, b) => a.rating - b.rating)[0];
   if (worst) {
-    html += `<div class="top10-row least-mark">
+    html += `<div class="worst-title">Absolute Worst Movie Ever</div>
+    <div class="top10-row least-mark">
       <div class="rank-num">11</div>
-      <div class="least-tag">Least</div>
+      <div class="least-tag">Worst</div>
       ${worst.poster ? `<img src="https://image.tmdb.org/t/p/w92${worst.poster}" style="width:36px; height:54px; border-radius:4px; object-fit:cover;">` : '<div style="width:36px; height:54px; background:#222; border-radius:4px;"></div>'}
       <div style="flex:1; cursor:pointer;" onclick="showDetails('${worst.id}')">
         <div class="title">${escapeHtml(worst.title)}</div>
-        <div class="meta">Least favorite of all time</div>
+        <div class="meta">${(worst.year || '') + languageLabel(worst)}</div>
       </div>
       <span class="rating">${worst.rating}%</span>
     </div>`;
@@ -2159,7 +2160,52 @@ function renderStats() {
     ${lowest ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:4px;">Lowest Rated</div><div style="font-weight:600;">${escapeHtml(lowest.title)} <span style="color:#d4af37;">${lowest.rating}%</span></div></div>` : ''}
     ${topGenres.length ? `<div style="margin-bottom:16px;"><div class="stat-label" style="margin-bottom:6px;">Top Genres</div>${topGenres.map(([g, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${escapeHtml(g)}</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
     ${topDecades.length ? `<div style="margin-bottom:18px;"><div class="stat-label" style="margin-bottom:6px;">By Decade</div>${topDecades.map(([d, n]) => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #2a2a2a; font-size:0.9rem;"><span>${d}s</span><span style="color:#d4af37;">${n}</span></div>`).join('')}</div>` : ''}
+    <div id="favPeople"><div class="empty">Looking up favorite director, actor, and studio...</div></div>
   `;
+  loadFavoritePeople(rated);
+}
+
+function loadFavoritePeople(rated) {
+  const el = document.getElementById('favPeople');
+  const apiKey = localStorage.getItem('tmdbKey');
+  if (!el) return;
+  if (!apiKey) { el.innerHTML = '<div class="meta">Add a TMDB key in Settings to see favorite director, actor, and studio.</div>'; return; }
+  const pool = rated
+    .filter(m => m.tmdbId && (m.favorite || m.rating >= 70))
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 12);
+  if (!pool.length) { el.innerHTML = ''; return; }
+  const key = pool.map(m => m.tmdbId + ':' + m.rating).join(',');
+  if (window._favPeople && window._favPeople.key === key) { el.innerHTML = window._favPeople.html; return; }
+  Promise.all(pool.map(m => {
+    const endpoint = m.mediaType === 'tv' ? 'tv' : 'movie';
+    return fetch(`https://api.themoviedb.org/3/${endpoint}/${m.tmdbId}?api_key=${apiKey}&append_to_response=credits`)
+      .then(r => r.json())
+      .then(d => ({ m, d }))
+      .catch(() => null);
+  })).then(rows => {
+    const dirs = {}, actors = {}, studios = {};
+    const bump = (bag, name, rating) => {
+      if (!name) return;
+      if (!bag[name]) bag[name] = { sum: 0, n: 0 };
+      bag[name].sum += rating;
+      bag[name].n += 1;
+    };
+    rows.filter(Boolean).forEach(({ m, d }) => {
+      const rating = m.rating || 0;
+      const crew = d.credits?.crew || [];
+      const cast = d.credits?.cast || [];
+      const director = crew.find(c => c.job === 'Director');
+      bump(dirs, director?.name, rating);
+      cast.slice(0, 3).forEach(c => bump(actors, c.name, rating));
+      (d.production_companies || []).slice(0, 2).forEach(c => bump(studios, c.name, rating));
+    });
+    const best = bag => Object.entries(bag).map(([name, v]) => ({ name, avg: Math.round(v.sum / v.n), n: v.n })).sort((a, b) => b.avg - a.avg || b.n - a.n)[0];
+    const line = (label, item) => item ? `<div style="margin-bottom:10px;"><div class="stat-label" style="margin-bottom:4px;">${label}</div><div style="font-weight:600;">${escapeHtml(item.name)} <span style="color:#d4af37;">${item.avg}%</span> <span class="meta">· ${item.n} film${item.n === 1 ? '' : 's'}</span></div></div>` : '';
+    const html = `<div style="margin-top:8px;">${line('Favorite Director', best(dirs))}${line('Favorite Actor', best(actors))}${line('Favorite Studio', best(studios))}</div>`;
+    window._favPeople = { key, html };
+    if (document.getElementById('favPeople')) document.getElementById('favPeople').innerHTML = html;
+  });
 }
 
 const ALL_TABS = [
@@ -2233,7 +2279,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.21</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.22</p>
   `;
 }
 
