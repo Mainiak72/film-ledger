@@ -241,6 +241,7 @@ function folderSidebarHtml(scope) {
     <button type="button" class="folder-item${active === '' ? ' on' : ''}" onclick="setFolder('', '${scope}')">All</button>
     ${items}
     <button type="button" class="folder-add" onclick="createFolder('${scope}')">+ Folder</button>
+    ${scope === 'watchlist' ? watchlistFilterBar() : ''}
   </aside>`;
 }
 
@@ -434,9 +435,6 @@ function renderList(tabId, filter) {
     html += `<div class="watch-layout">
       ${folderSidebarHtml('watchlist')}
       <div class="watch-main">
-        <div class="tab-tools-row">
-          ${watchlistFilterBar()}
-        </div>
         <div id="${tabId}List" class="list-container ${view}">`;
     html += list.length ? list.map(m => renderItem(m, view)).join('') : '<div class="empty">Nothing here yet.</div>';
     html += `</div></div></div>`;
@@ -470,11 +468,11 @@ function watchlistFilterBar() {
   const active = watchlistFilters.genres.map(g => `<span class="filter-chip" onclick="removeWatchlistFilter('${escapeHtml(g)}')">${escapeHtml(g)} ×</span>`).join('');
   const available = allGenres.filter(g => !watchlistFilters.genres.includes(g));
   return `<div class="free-filters">
-    <button type="button" onclick="document.getElementById('watchlistAdd').classList.toggle('hide')">+ Filter</button>
-    <div id="watchlistAdd" class="hide" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-      ${available.map(g => `<button type="button" onclick="addWatchlistFilter('${escapeHtml(g)}')" style="padding:4px 10px; font-size:0.75rem; border-radius:6px; background:#141210; color:#a89880; border:1px solid #2e2820;">${escapeHtml(g)}</button>`).join('')}
+    <button type="button" class="folder-add" onclick="document.getElementById('watchlistAdd').classList.toggle('hide')">+ Filter</button>
+    <div id="watchlistAdd" class="hide">
+      ${available.map(g => `<button type="button" class="folder-item" onclick="addWatchlistFilter('${escapeHtml(g)}')">${escapeHtml(g)}</button>`).join('')}
     </div>
-    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">${active}</div>
+    <div>${active}</div>
   </div>`;
 }
 function filterTab(tabId) {
@@ -1987,7 +1985,7 @@ function renderSettings() {
         ${ALL_TABS.map(([id, label]) => `<button type="button" data-tab="${id}" class="tab-toggle${visibleTabs().has(id) ? ' on' : ''}" onclick="toggleTabVisibility('${id}')">${escapeHtml(label)}</button>`).join('')}
       </div>
     </div>
-    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.04</p>
+    <p class="backup-note" style="margin-top:14px;">Film Ledger v6.05</p>
   `;
 }
 
